@@ -1,0 +1,35 @@
+[package]
+name = "kid-text-editor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+readme.workspace = true
+keywords = ["editor", "text-editor", "mcp"]
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+clap-verbosity-flag.workspace = true
+rmcp = { workspace = true, features = [
+  "server",
+  "schemars",
+  "transport-io",
+  "transport-streamable-http-server",
+] }
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower-http = { workspace = true, features = ["cors", "trace"] }
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+assert_fs.workspace = true
