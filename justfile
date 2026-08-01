@@ -18,17 +18,13 @@ lint:
 
 # Run all tests (unit tests + Cucumber-BDD integration tests)
 [group('test')]
-test: test-unit
-
-# Unit tests (model.rs, resources.rs)
-[group('test')]
-test-unit:
-    cargo test --lib
+test:
+    cargo test
 
 # Run a single unit test by name
 [group('test')]
 test-one name:
-    cargo test --lib -- {{name}}
+    cargo test -- {{name}}
 
 # --- debug build ---
 

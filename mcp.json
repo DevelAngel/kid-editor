@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "KID-Editor": {
+      "type": "streamable-http",
+      "url": "http://localhost:9300/mcp",
+      "advertisedExtensions": {
+        "io.modelcontextprotocol/ui": false,
+        "io.modelcontextprotocol/tasks": false
+      }
+    }
+  }
+}
