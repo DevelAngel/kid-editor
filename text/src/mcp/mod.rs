@@ -5,6 +5,7 @@
 mod create;
 mod helper;
 mod insert;
+mod str_replace;
 mod tree;
 mod view;
 
@@ -44,6 +45,7 @@ impl McpService {
             workspace_root,
             tool_router: Self::create_tool_router()
                 + Self::insert_tool_router()
+                + Self::str_replace_tool_router()
                 + Self::tree_tool_router()
                 + Self::view_tool_router(),
         }
