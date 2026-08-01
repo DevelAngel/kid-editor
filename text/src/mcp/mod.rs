@@ -4,6 +4,7 @@
 //! and rejected if they would escape it.
 mod create;
 mod helper;
+mod insert;
 mod tree;
 mod view;
 
@@ -42,6 +43,7 @@ impl McpService {
         Self {
             workspace_root,
             tool_router: Self::create_tool_router()
+                + Self::insert_tool_router()
                 + Self::tree_tool_router()
                 + Self::view_tool_router(),
         }

@@ -57,7 +57,7 @@ impl McpService {
     }
 }
 
-fn not_found_or_io(display_path: &str, e: io::Error) -> McpError {
+pub(super) fn not_found_or_io(display_path: &str, e: io::Error) -> McpError {
     if e.kind() == io::ErrorKind::NotFound {
         McpError::invalid_params(format!("{display_path}: no such file or directory"), None)
     } else {
