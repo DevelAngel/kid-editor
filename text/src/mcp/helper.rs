@@ -55,3 +55,56 @@ fn normalize_lexically(path: &Path) -> PathBuf {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_fs::TempDir;
+    use std::path::Path;
+
+    #[test]
+    fn resolve_relative_path_stays_in_workspace() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        let resolved = svc.resolve("notes/todo.md").unwrap();
+        assert_eq!(resolved, dir.path().join("notes/todo.md"));
+    }
+
+    #[test]
+    fn resolve_absolute_path_inside_workspace_is_allowed() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        let abs = dir.path().join("file.txt");
+        let resolved = svc.resolve(abs.to_str().unwrap()).unwrap();
+        assert_eq!(resolved, abs);
+    }
+
+    #[test]
+    fn resolve_rejects_dotdot_escape() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        assert!(svc.resolve("../outside.txt").is_err());
+    }
+
+    #[test]
+    fn resolve_rejects_absolute_path_outside_workspace() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        assert!(svc.resolve("/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn resolve_rejects_dotdot_that_stays_lexically_inside_but_traverses_out() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        // "sub/../../escape" normalizes to a path outside the root even
+        // though it starts inside it.
+        assert!(svc.resolve("sub/../../escape").is_err());
+    }
+
+    #[test]
+    fn normalize_collapses_dot_and_dotdot() {
+        let p = normalize_lexically(Path::new("/a/./b/../c"));
+        assert_eq!(p, Path::new("/a/c"));
+    }
+}

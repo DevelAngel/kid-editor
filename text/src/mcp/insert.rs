@@ -53,3 +53,25 @@ impl McpService {
         ))]))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_fs::TempDir;
+    use std::fs;
+
+    #[test]
+    fn insert_adds_line_after_given_index() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
+        svc.insert(Parameters(InsertInput {
+            path: "f.txt".into(),
+            insert_line: 1,
+            new_str: "x".into(),
+        }))
+        .unwrap();
+        let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
+        assert_eq!(content, "a\nx\nb\n");
+    }
+}

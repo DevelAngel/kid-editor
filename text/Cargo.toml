@@ -29,8 +29,9 @@ tower-http = { workspace = true, features = ["cors", "trace"] }
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-url = { version = "2.5.8", features = ["serde"] }
-type-state-builder = "0.5.1"
+url = { workspace = true, features = ["serde"] }
+type-state-builder.workspace = true
 
 [dev-dependencies]
 assert_fs.workspace = true
+indoc.workspace = true

@@ -111,3 +111,72 @@ fn build_tree(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_fs::TempDir;
+    use indoc::indoc;
+    use std::fs;
+
+    #[test]
+    fn tree_renders_nested_structure_with_counts() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "").unwrap();
+        fs::create_dir(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("src/lib.rs"), "").unwrap();
+
+        let svc = McpService::new(dir.to_path_buf());
+        let result = svc
+            .tree(Parameters(TreeInput {
+                path: None,
+                max_depth: None,
+            }))
+            .unwrap();
+        let text = match &result.content[0] {
+            ContentBlock::Text(t) => t.text.clone(),
+            _ => panic!("expected text content"),
+        };
+
+        assert_eq!(
+            text,
+            indoc! {"
+                .
+                ├── Cargo.toml
+                └── src
+                    └── lib.rs
+
+                1 directory, 2 files
+            "}
+        );
+    }
+
+    #[test]
+    fn tree_respects_max_depth() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir_all(dir.path().join("a/b")).unwrap();
+        fs::write(dir.path().join("a/b/deep.txt"), "").unwrap();
+
+        let svc = McpService::new(dir.to_path_buf());
+        let result = svc
+            .tree(Parameters(TreeInput {
+                path: None,
+                max_depth: Some(1),
+            }))
+            .unwrap();
+        let text = match &result.content[0] {
+            ContentBlock::Text(t) => t.text.clone(),
+            _ => panic!("expected text content"),
+        };
+
+        assert_eq!(
+            text,
+            indoc! {"
+                .
+                └── a
+
+                1 directory, 0 files
+            "}
+        );
+    }
+}

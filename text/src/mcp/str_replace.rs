@@ -57,3 +57,38 @@ impl McpService {
         ))]))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_fs::TempDir;
+    use std::fs;
+
+    #[test]
+    fn str_replace_requires_unique_match() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
+        let result = svc.str_replace(Parameters(StrReplaceInput {
+            path: "f.txt".into(),
+            old_str: "foo".into(),
+            new_str: "bar".into(),
+        }));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn str_replace_replaces_unique_match() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf());
+        fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
+        svc.str_replace(Parameters(StrReplaceInput {
+            path: "f.txt".into(),
+            old_str: "foo".into(),
+            new_str: "bar".into(),
+        }))
+        .unwrap();
+        let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
+        assert_eq!(content, "bar\nbaz\n");
+    }
+}
