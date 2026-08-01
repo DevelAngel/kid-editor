@@ -2,6 +2,7 @@
 //! scoped to a single workspace directory.
 //! All paths, relative or absolute, are resolved against the workspace root
 //! and rejected if they would escape it.
+mod create;
 mod helper;
 mod tree;
 mod view;
@@ -40,7 +41,9 @@ impl McpService {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            tool_router: Self::view_tool_router() + Self::tree_tool_router(),
+            tool_router: Self::create_tool_router()
+                + Self::tree_tool_router()
+                + Self::view_tool_router(),
         }
     }
 }
