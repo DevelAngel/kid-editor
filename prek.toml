@@ -1,0 +1,38 @@
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+[[repos.hooks]]
+id = "trailing-whitespace"
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos]]
+repo = "local"
+[[repos.hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+entry = "cargo fmt --"
+language = "system"
+types = ["rust"]
+pass_filenames = false # This makes it a lot faster
+[[repos.hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+entry = "cargo clippy --all-targets --all-features -- -D warnings"
+[[repos.hooks]]
+id = "cargo-test"
+name = "cargo test"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+entry = "just test"
+[[repos.hooks]]
+id = "git-cliff"
+name = "git cliff"
+language = "system"
+pass_filenames = false
+entry = "git cliff --offline --bump --output CHANGELOG.md"
+files = "Cargo.(lock|toml)$"
