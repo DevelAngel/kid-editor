@@ -1,9 +1,10 @@
 mod cli;
 mod mcp;
+mod oauth;
 mod server;
 
-use crate::cli::Cli;
 use crate::server::McpServer;
+use crate::{cli::Cli, oauth::McpClientsConfig};
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -18,10 +19,22 @@ async fn main() -> Result<()> {
         .with_writer(io::stderr)
         .init();
 
+    let clients = if cli.oauth.disabled {
+        None
+    } else {
+        let Some(clients_file) = cli.oauth.clients_file else {
+            unreachable!("either oauth is disabled or clients file is set")
+        };
+        let clients = McpClientsConfig::load(&clients_file)
+            .context("failed to load OAuth clients configuration")?;
+        Some(clients)
+    };
+
     McpServer::builder()
         .base_url(cli.base_url)
         .allowed_origins(cli.allowed_origins)
         .workspace_root(cli.workspace_root)
+        .clients(clients)
         .build()
         .serve(cli.addr)
         .await

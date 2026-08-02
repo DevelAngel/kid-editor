@@ -1,0 +1,26 @@
+# Example MCP client configuration.
+#
+# Lists the MCP clients allowed to authenticate via OAuth against the MCP server.
+# Copy this file, fill in real redirect URIs and secrets, and
+# point --clients-file at it.
+#
+# An unset or empty file disables MCP OAuth entirely
+# (no client can complete the authorization flow).
+
+[[client]]
+client-id = "mcp-inspector"
+secret = "replace-with-a-generated-secret"
+redirect-uri = "http://localhost:6274/oauth/callback"
+
+[[client]]
+client-id = "example.ai"
+secret = "replace-with-a-another-generated-secret"
+redirect-uri = "https://example.ai/api/mcp/auth_callback"
+
+# Machine client (e.g. a systemd-triggered one-shot job):
+# no user is present to approve an authorization_code flow,
+# so it authenticates via the client_credentials grant instead.
+# redirect-uri can be omitted.
+[[client]]
+client-id = "kid-agent"
+secret = "replace-with-yet-another-generated-secret"
