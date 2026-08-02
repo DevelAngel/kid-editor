@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn insert_adds_line_after_given_index() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.insert(Parameters(InsertInput {
             path: "f.txt".into(),

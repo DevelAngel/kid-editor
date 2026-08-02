@@ -6,9 +6,12 @@ use rmcp::model::ErrorData as McpError;
 use std::path::{Component, Path, PathBuf};
 
 impl McpService {
-    /// Resolves `input` (relative or absolute) against the workspace root
-    /// and rejects anything that would escape it — via `..` segments or,
-    /// for paths that already exist, via a symlink pointing outside.
+    /// Resolves `input` (relative or absolute) against the workspace root.
+    /// Rejects anything that would escape it — via `..` segments or, for
+    /// paths that already exist, via a symlink pointing outside — and
+    /// anything under an ignored name (see `ignore`), which is treated as
+    /// nonexistent rather than merely hidden: no tool can see, read, or
+    /// write it, the same as if it were outside the workspace.
     pub(super) fn resolve(&self, input: &str) -> Result<PathBuf, McpError> {
         let candidate = Path::new(input);
         let joined = if candidate.is_absolute() {
@@ -21,6 +24,17 @@ impl McpService {
         if !normalized.starts_with(&self.workspace_root) {
             return Err(McpError::invalid_params(
                 format!("path escapes the workspace: {input}"),
+                None,
+            ));
+        }
+
+        if let Ok(relative) = normalized.strip_prefix(&self.workspace_root)
+            && relative
+                .components()
+                .any(|c| self.ignore.iter().any(|i| i.as_str() == c.as_os_str()))
+        {
+            return Err(McpError::invalid_params(
+                format!("{input}: no such file or directory"),
                 None,
             ));
         }
@@ -65,7 +79,7 @@ mod tests {
     #[test]
     fn resolve_relative_path_stays_in_workspace() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         let resolved = svc.resolve("notes/todo.md").unwrap();
         assert_eq!(resolved, dir.path().join("notes/todo.md"));
     }
@@ -73,7 +87,7 @@ mod tests {
     #[test]
     fn resolve_absolute_path_inside_workspace_is_allowed() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         let abs = dir.path().join("file.txt");
         let resolved = svc.resolve(abs.to_str().unwrap()).unwrap();
         assert_eq!(resolved, abs);
@@ -82,24 +96,46 @@ mod tests {
     #[test]
     fn resolve_rejects_dotdot_escape() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         assert!(svc.resolve("../outside.txt").is_err());
     }
 
     #[test]
     fn resolve_rejects_absolute_path_outside_workspace() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         assert!(svc.resolve("/etc/passwd").is_err());
     }
 
     #[test]
     fn resolve_rejects_dotdot_that_stays_lexically_inside_but_traverses_out() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         // "sub/../../escape" normalizes to a path outside the root even
         // though it starts inside it.
         assert!(svc.resolve("sub/../../escape").is_err());
+    }
+
+    #[test]
+    fn resolve_rejects_ignored_top_level_entry() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf(), vec![".git".to_string()]);
+        assert!(svc.resolve(".git").is_err());
+        assert!(svc.resolve(".git/config").is_err());
+    }
+
+    #[test]
+    fn resolve_rejects_path_nested_under_ignored_directory() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf(), vec!["target".to_string()]);
+        assert!(svc.resolve("target/debug/deep/file.txt").is_err());
+    }
+
+    #[test]
+    fn resolve_allows_entry_not_matching_ignore_list() {
+        let dir = TempDir::new().unwrap();
+        let svc = McpService::new(dir.to_path_buf(), vec!["target".to_string()]);
+        assert!(svc.resolve("src/main.rs").is_ok());
     }
 
     #[test]

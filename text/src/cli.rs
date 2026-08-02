@@ -31,6 +31,19 @@ pub struct Cli {
     #[cfg_attr(debug_assertions, clap(default_value = "http://localhost/"))]
     pub allowed_origins: Vec<Url>,
 
+    /// Directory/file names invisible to every tool — treated as nonexistent,
+    /// not just hidden from `tree`, e.g. ".git" or "target".
+    /// Can be repeated or comma-separated.
+    #[clap(
+        long = "ignore",
+        value_name = "NAME",
+        value_delimiter = ',',
+        default_value = ".git,.hg,.svn,.jj,target,node_modules,.venv,venv,\
+                          __pycache__,.mypy_cache,.pytest_cache,.ruff_cache,\
+                          dist,build,.next,.idea,.vscode,.DS_Store"
+    )]
+    pub ignore: Vec<String>,
+
     #[command(flatten)]
     pub oauth: OauthOptions,
 

@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
         .base_url(cli.base_url)
         .allowed_origins(cli.allowed_origins)
         .workspace_root(cli.workspace_root)
+        .ignore(cli.ignore)
         .clients(clients)
         .build()
         .serve(cli.addr)

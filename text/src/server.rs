@@ -29,13 +29,19 @@ pub struct McpServer {
     #[builder(required)]
     base_url: Url,
     allowed_origins: Vec<Url>,
+    ignore: Vec<String>,
 }
 
 impl McpServer {
     pub async fn serve(self, addr: SocketAddr) -> Result<()> {
+        tracing::warn!("Workspace: {}", self.workspace_root.display());
         tracing::warn!(
-            "MCP server will serve workspace: {}",
-            self.workspace_root.display(),
+            "Ignored (invisible to all tools): {}",
+            self.ignore
+                .iter()
+                .cloned()
+                .reduce(|s, name| format!("{s} | {name}"))
+                .unwrap_or("none".to_owned())
         );
 
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
@@ -58,8 +64,9 @@ impl McpServer {
 
         let shutdown = CancellationToken::new();
         let workspace_root = self.workspace_root.canonicalize()?;
+        let ignore = self.ignore;
         let mcp_service = StreamableHttpService::new(
-            move || Ok(McpService::new(workspace_root.clone())),
+            move || Ok(McpService::new(workspace_root.clone(), ignore.clone())),
             LocalSessionManager::default().into(),
             StreamableHttpServerConfig::default()
                 .with_allowed_origins(allowed_origins)

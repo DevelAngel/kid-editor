@@ -20,6 +20,10 @@ use std::path::PathBuf;
 #[derive(Clone)]
 pub struct McpService {
     workspace_root: PathBuf,
+    /// Names treated as nonexistent by every tool, e.g. ".git" or "target" —
+    /// not just hidden from `tree`, but unreadable, unwritable, and invisible
+    /// everywhere a path is resolved.
+    ignore: Vec<String>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -40,9 +44,10 @@ impl ServerHandler for McpService {
 }
 
 impl McpService {
-    pub fn new(workspace_root: PathBuf) -> Self {
+    pub fn new(workspace_root: PathBuf, ignore: Vec<String>) -> Self {
         Self {
             workspace_root,
+            ignore,
             tool_router: Self::create_tool_router()
                 + Self::insert_tool_router()
                 + Self::str_replace_tool_router()

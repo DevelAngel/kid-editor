@@ -46,7 +46,15 @@ impl McpService {
         let mut out = String::from(".\n");
         let mut dirs = 0usize;
         let mut files = 0usize;
-        build_tree(&root, "", input.max_depth, &mut out, &mut dirs, &mut files)?;
+        build_tree(
+            &root,
+            "",
+            input.max_depth,
+            &self.ignore,
+            &mut out,
+            &mut dirs,
+            &mut files,
+        )?;
         out.push_str(&format!(
             "\n{dirs} director{}, {files} file{}\n",
             if dirs == 1 { "y" } else { "ies" },
@@ -73,6 +81,7 @@ fn build_tree(
     dir: &Path,
     prefix: &str,
     remaining_depth: Option<usize>,
+    ignore: &[String],
     out: &mut String,
     dirs: &mut usize,
     files: &mut usize,
@@ -80,6 +89,12 @@ fn build_tree(
     let mut entries: Vec<_> = fs::read_dir(dir)
         .map_err(|e| McpError::internal_error(format!("{}: {e}", dir.display()), None))?
         .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            let name = entry.file_name();
+            !ignore
+                .iter()
+                .any(|ignored| ignored.as_str() == name.to_string_lossy())
+        })
         .collect();
     entries.sort_by_key(|entry| entry.file_name());
 
@@ -103,7 +118,15 @@ fn build_tree(
             if descend {
                 let child_prefix = format!("{prefix}{}", if is_last { "    " } else { "│   " });
                 let next_depth = remaining_depth.map(|d| d - 1);
-                build_tree(&entry.path(), &child_prefix, next_depth, out, dirs, files)?;
+                build_tree(
+                    &entry.path(),
+                    &child_prefix,
+                    next_depth,
+                    ignore,
+                    out,
+                    dirs,
+                    files,
+                )?;
             }
         } else {
             *files += 1;
@@ -126,7 +149,7 @@ mod tests {
         fs::create_dir(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("src/lib.rs"), "").unwrap();
 
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,
@@ -152,12 +175,46 @@ mod tests {
     }
 
     #[test]
+    fn tree_hides_ignored_entries() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir(dir.path().join(".git")).unwrap();
+        fs::write(dir.path().join(".git/HEAD"), "").unwrap();
+        fs::create_dir(dir.path().join("target")).unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "").unwrap();
+
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![".git".to_string(), "target".to_string()],
+        );
+        let result = svc
+            .tree(Parameters(TreeInput {
+                path: None,
+                max_depth: None,
+            }))
+            .unwrap();
+        let text = match &result.content[0] {
+            ContentBlock::Text(t) => t.text.clone(),
+            _ => panic!("expected text content"),
+        };
+
+        assert_eq!(
+            text,
+            indoc! {"
+                .
+                └── Cargo.toml
+
+                0 directories, 1 file
+            "}
+        );
+    }
+
+    #[test]
     fn tree_respects_max_depth() {
         let dir = TempDir::new().unwrap();
         fs::create_dir_all(dir.path().join("a/b")).unwrap();
         fs::write(dir.path().join("a/b/deep.txt"), "").unwrap();
 
-        let svc = McpService::new(dir.to_path_buf());
+        let svc = McpService::new(dir.to_path_buf(), vec![]);
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,
