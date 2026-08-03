@@ -1,4 +1,5 @@
 use super::McpService;
+use super::workspace_path::UnresolvedPath;
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -11,7 +12,7 @@ use std::fs;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CreateInput {
-    path: String,
+    path: UnresolvedPath,
     /// Full file content. Overwrites the file if it already exists.
     file_text: String,
 }
@@ -25,16 +26,15 @@ impl McpService {
         &self,
         Parameters(input): Parameters<CreateInput>,
     ) -> Result<CallToolResult, McpError> {
-        let path = self.resolve(&input.path)?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| McpError::internal_error(format!("{}: {e}", input.path), None))?;
+        let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        if let Some(parent) = path.as_path().parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         }
-        fs::write(&path, &input.file_text)
-            .map_err(|e| McpError::internal_error(format!("{}: {e}", input.path), None))?;
+        fs::write(path.as_path(), &input.file_text)
+            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "wrote {}",
-            input.path
+            "wrote {path}"
         ))]))
     }
 }

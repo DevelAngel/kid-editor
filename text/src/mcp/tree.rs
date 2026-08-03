@@ -1,4 +1,5 @@
 use super::McpService;
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,37 +9,43 @@ use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
 use std::fs;
-use std::io;
 use std::path::Path;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct TreeInput {
     /// Directory to start from, relative or absolute (default: workspace root)
     #[serde(default)]
-    path: Option<String>,
+    path: Option<UnresolvedPath>,
     /// How many levels deep to show, 1 = only direct children (default: unlimited)
     #[serde(default)]
     max_depth: Option<usize>,
 }
 
-#[tool_router(router = view_tool_router, vis = "pub(super)")]
+#[tool_router(router = tree_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
         description = "Show a directory as a tree, like the Unix `tree` command — faster overview than repeated `view` calls"
     )]
     fn tree(&self, Parameters(input): Parameters<TreeInput>) -> Result<CallToolResult, McpError> {
-        let root = match &input.path {
-            Some(p) => self.resolve(p)?,
-            None => self.workspace_root.clone(),
-        };
-        let metadata = fs::metadata(&root)
-            .map_err(|e| not_found_or_io(input.path.as_deref().unwrap_or("."), e))?;
+        let resolved = input
+            .path
+            .map(|p| p.resolve(&self.workspace_root, &self.ignore))
+            .transpose()?;
+        // `resolved` stays a `WorkspacePath` (or absent, meaning "the
+        // workspace root itself" — already trusted, nothing to resolve)
+        // for its whole lifetime here; only borrow from it at the point of
+        // use, never take it apart into loose `PathBuf`/`String` values.
+        let root: &Path = resolved
+            .as_ref()
+            .map_or(&self.workspace_root, |w| w.as_path());
+        let display = resolved
+            .as_ref()
+            .map_or_else(|| ".".to_owned(), ToString::to_string);
+
+        let metadata = fs::metadata(root).map_err(|e| not_found_or_io(&display, e))?;
         if !metadata.is_dir() {
             return Err(McpError::invalid_params(
-                format!(
-                    "{} is not a directory",
-                    input.path.as_deref().unwrap_or(".")
-                ),
+                format!("{display} is not a directory"),
                 None,
             ));
         }
@@ -47,7 +54,7 @@ impl McpService {
         let mut dirs = 0usize;
         let mut files = 0usize;
         build_tree(
-            &root,
+            root,
             "",
             input.max_depth,
             &self.ignore,
@@ -62,14 +69,6 @@ impl McpService {
         ));
 
         Ok(CallToolResult::success(vec![ContentBlock::text(out)]))
-    }
-}
-
-pub(super) fn not_found_or_io(display_path: &str, e: io::Error) -> McpError {
-    if e.kind() == io::ErrorKind::NotFound {
-        McpError::invalid_params(format!("{display_path}: no such file or directory"), None)
-    } else {
-        McpError::internal_error(format!("{display_path}: {e}"), None)
     }
 }
 

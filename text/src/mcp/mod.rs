@@ -3,11 +3,11 @@
 //! All paths, relative or absolute, are resolved against the workspace root
 //! and rejected if they would escape it.
 mod create;
-mod helper;
 mod insert;
 mod str_replace;
 mod tree;
 mod view;
+mod workspace_path;
 
 use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;

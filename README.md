@@ -52,10 +52,14 @@ That's not a limitation — it's the point.
 
 **A sandbox, not an open door.**
 Every path—relative or absolute — gets resolved against the workspace root before anything happens to it.
-Try to step outside that root, even through a symlink pointing the wrong way, and the request fails.
+Try to step outside that root, and the request fails.
 Not "discouraged." Fails.
 The model isn't asked nicely to stay inside the workspace.
 It structurally cannot leave it.
+The one thing this doesn't cover is a symlink someone placed inside the
+workspace before the server ever started — nothing here can create one,
+so if it exists, that was a decision made outside `kid-editor`, not
+something a client talked it into.
 
 **Cutting the noise.**
 `.git`, `target`, `node_modules` — directories like these clutter every overview and rarely hold anything a model needs to see.

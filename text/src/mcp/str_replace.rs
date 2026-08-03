@@ -1,5 +1,5 @@
 use super::McpService;
-use super::tree;
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -12,7 +12,7 @@ use std::fs;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct StrReplaceInput {
-    path: String,
+    path: UnresolvedPath,
     /// Exact text to replace — must occur exactly once in the file
     old_str: String,
     /// Replacement text
@@ -27,33 +27,30 @@ impl McpService {
         &self,
         Parameters(input): Parameters<StrReplaceInput>,
     ) -> Result<CallToolResult, McpError> {
-        let path = self.resolve(&input.path)?;
-        let content =
-            fs::read_to_string(&path).map_err(|e| tree::not_found_or_io(&input.path, e))?;
+        let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        let content = fs::read_to_string(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
 
         let occurrences = content.matches(input.old_str.as_str()).count();
         if occurrences == 0 {
             return Err(McpError::invalid_params(
-                format!("old_str not found in {}", input.path),
+                format!("old_str not found in {path}"),
                 None,
             ));
         }
         if occurrences > 1 {
             return Err(McpError::invalid_params(
                 format!(
-                    "old_str occurs {occurrences} times in {} — include more surrounding context to make it unique",
-                    input.path
+                    "old_str occurs {occurrences} times in {path} — include more surrounding context to make it unique"
                 ),
                 None,
             ));
         }
 
         let updated = content.replacen(&input.old_str, &input.new_str, 1);
-        fs::write(&path, updated)
-            .map_err(|e| McpError::internal_error(format!("{}: {e}", input.path), None))?;
+        fs::write(path.as_path(), updated)
+            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "replaced 1 occurrence in {}",
-            input.path
+            "replaced 1 occurrence in {path}"
         ))]))
     }
 }
@@ -70,7 +67,7 @@ mod tests {
         let svc = McpService::new(dir.to_path_buf(), vec![]);
         fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
         let result = svc.str_replace(Parameters(StrReplaceInput {
-            path: "f.txt".into(),
+            path: UnresolvedPath::new("f.txt"),
             old_str: "foo".into(),
             new_str: "bar".into(),
         }));
@@ -83,7 +80,7 @@ mod tests {
         let svc = McpService::new(dir.to_path_buf(), vec![]);
         fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
         svc.str_replace(Parameters(StrReplaceInput {
-            path: "f.txt".into(),
+            path: UnresolvedPath::new("f.txt"),
             old_str: "foo".into(),
             new_str: "bar".into(),
         }))

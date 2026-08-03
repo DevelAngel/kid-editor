@@ -1,5 +1,5 @@
 use super::McpService;
-use super::tree;
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -12,7 +12,7 @@ use std::fs;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct InsertInput {
-    path: String,
+    path: UnresolvedPath,
     /// Line number after which to insert; 0 inserts at the start of the file
     insert_line: usize,
     new_str: String,
@@ -25,9 +25,8 @@ impl McpService {
         &self,
         Parameters(input): Parameters<InsertInput>,
     ) -> Result<CallToolResult, McpError> {
-        let path = self.resolve(&input.path)?;
-        let content =
-            fs::read_to_string(&path).map_err(|e| tree::not_found_or_io(&input.path, e))?;
+        let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        let content = fs::read_to_string(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
 
         let mut lines: Vec<&str> = content.lines().collect();
         if input.insert_line > lines.len() {
@@ -45,11 +44,11 @@ impl McpService {
         if content.ends_with('\n') {
             updated.push('\n');
         }
-        fs::write(&path, updated)
-            .map_err(|e| McpError::internal_error(format!("{}: {e}", input.path), None))?;
+        fs::write(path.as_path(), updated)
+            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "inserted after line {} in {}",
-            input.insert_line, input.path
+            "inserted after line {} in {path}",
+            input.insert_line
         ))]))
     }
 }
@@ -66,7 +65,7 @@ mod tests {
         let svc = McpService::new(dir.to_path_buf(), vec![]);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.insert(Parameters(InsertInput {
-            path: "f.txt".into(),
+            path: UnresolvedPath::new("f.txt"),
             insert_line: 1,
             new_str: "x".into(),
         }))

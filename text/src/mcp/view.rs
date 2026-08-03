@@ -1,4 +1,5 @@
 use super::McpService;
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -13,20 +14,20 @@ use std::path::Path;
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ViewInput {
     /// Path to a file or directory, relative or absolute (resolved against the workspace root)
-    pub path: String,
+    pub path: UnresolvedPath,
     /// Optional 1-indexed inclusive line range, e.g. [1, 50]. Only valid for files.
     #[serde(default)]
     pub view_range: Option<[usize; 2]>,
 }
 
-#[tool_router(router = tree_tool_router, vis = "pub(super)")]
+#[tool_router(router = view_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
         description = "View a file's contents (numbered lines, optionally a line range) or list a directory's entries"
     )]
     fn view(&self, Parameters(input): Parameters<ViewInput>) -> Result<CallToolResult, McpError> {
-        let path = self.resolve(&input.path)?;
-        let metadata = fs::metadata(&path).map_err(|e| not_found_or_io(&input.path, e))?;
+        let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        let metadata = fs::metadata(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
 
         if metadata.is_dir() {
             if input.view_range.is_some() {
@@ -36,12 +37,12 @@ impl McpService {
                 ));
             }
             return Ok(CallToolResult::success(vec![ContentBlock::text(
-                list_directory(&path)?,
+                list_directory(path.as_path())?,
             )]));
         }
 
-        let content = std::fs::read_to_string(&path)
-            .map_err(|e| McpError::internal_error(format!("{}: {e}", input.path), None))?;
+        let content = fs::read_to_string(path.as_path())
+            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         let text = render_numbered(&content, input.view_range)?;
         Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
@@ -87,12 +88,4 @@ fn list_directory(path: &Path) -> Result<String, McpError> {
         .collect();
     entries.sort();
     Ok(entries.join("\n"))
-}
-
-fn not_found_or_io(display_path: &str, e: std::io::Error) -> McpError {
-    if e.kind() == std::io::ErrorKind::NotFound {
-        McpError::invalid_params(format!("{display_path}: no such file or directory"), None)
-    } else {
-        McpError::internal_error(format!("{display_path}: {e}"), None)
-    }
 }
