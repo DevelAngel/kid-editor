@@ -182,6 +182,22 @@ impl WorkspacePath {
     }
 }
 
+/// Refuses `path` if it names the workspace's `justfile`, independent of
+/// the ignore list. See ADR 0003: `just_run` executes recipes from this
+/// file, so nothing that can change file contents may touch it — but
+/// `view`/`tree` must keep reading it, since that's how an agent learns
+/// which recipes exist. Callers that write to the filesystem call this
+/// right after resolving the path; `view.rs` and `tree.rs` never call it.
+pub(super) fn refuse_justfile_write(path: &WorkspacePath) -> Result<(), McpError> {
+    if path.relative == Path::new("justfile") {
+        return Err(McpError::invalid_params(
+            format!("{path}: justfile is read-only through this server (see ADR 0003)"),
+            None,
+        ));
+    }
+    Ok(())
+}
+
 fn escapes_workspace(unresolved: &Path) -> McpError {
     McpError::invalid_params(
         format!("path escapes the workspace: {}", unresolved.display()),

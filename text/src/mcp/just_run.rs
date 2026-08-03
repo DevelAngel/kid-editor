@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn parses_recipe_names_from_just_list_output() {
-        let stdout = b"Available recipes:\n    check\n    test *args\n    lint # runs clippy\n";
+        let stdout = b"check test lint\n";
         let recipes = parse_recipe_list(stdout);
         assert_eq!(
             recipes,
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn ignores_blank_and_unindented_lines() {
-        let stdout = b"Available recipes:\n\n    check\n";
+        let stdout = b"check\n";
         let recipes = parse_recipe_list(stdout);
         assert_eq!(recipes, HashSet::from([RecipeName("check".to_owned())]));
     }

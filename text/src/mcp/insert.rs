@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, not_found_or_io};
+use super::workspace_path::{UnresolvedPath, not_found_or_io, refuse_justfile_write};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -26,6 +26,7 @@ impl McpService {
         Parameters(input): Parameters<InsertInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        refuse_justfile_write(&path)?;
         let content = fs::read_to_string(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
 
         let mut lines: Vec<&str> = content.lines().collect();
@@ -57,12 +58,13 @@ impl McpService {
 mod tests {
     use super::*;
     use assert_fs::TempDir;
+    use std::collections::HashSet;
     use std::fs;
 
     #[test]
     fn insert_adds_line_after_given_index() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![]);
+        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.insert(Parameters(InsertInput {
             path: UnresolvedPath::new("f.txt"),

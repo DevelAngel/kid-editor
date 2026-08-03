@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::UnresolvedPath;
+use super::workspace_path::{UnresolvedPath, refuse_justfile_write};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -27,6 +27,7 @@ impl McpService {
         Parameters(input): Parameters<CreateInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
+        refuse_justfile_write(&path)?;
         if let Some(parent) = path.as_path().parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
