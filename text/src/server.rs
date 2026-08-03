@@ -1,4 +1,4 @@
-use crate::mcp::McpService;
+use crate::mcp::{McpService, RecipeName};
 use crate::oauth::{self, McpClientsConfig, McpOAuthStore};
 
 use anyhow::Result;
@@ -43,6 +43,9 @@ impl McpServer {
                 .reduce(|s, name| format!("{s} | {name}"))
                 .unwrap_or("none".to_owned())
         );
+        tracing::warn!(
+            "Write-protected (readable, but no tool may create/insert/replace it): justfile"
+        );
 
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
             .chain(self.allowed_origins)
@@ -65,8 +68,30 @@ impl McpServer {
         let shutdown = CancellationToken::new();
         let workspace_root = self.workspace_root.canonicalize()?;
         let ignore = self.ignore;
+
+        let just_recipes = RecipeName::discover(&workspace_root);
+        match just_recipes.len() {
+            0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
+            n => {
+                tracing::warn!(
+                    "just_run tool enabled and discovered {n} recipes: {receipes}",
+                    receipes = just_recipes
+                        .iter()
+                        .map(|name| name.to_string())
+                        .reduce(|s, name| format!("{s} | {name}"))
+                        .unwrap()
+                );
+            }
+        }
+
         let mcp_service = StreamableHttpService::new(
-            move || Ok(McpService::new(workspace_root.clone(), ignore.clone())),
+            move || {
+                Ok(McpService::new(
+                    workspace_root.clone(),
+                    ignore.clone(),
+                    just_recipes.clone(),
+                ))
+            },
             LocalSessionManager::default().into(),
             StreamableHttpServerConfig::default()
                 .with_allowed_origins(allowed_origins)
