@@ -7,15 +7,14 @@ id = "trailing-whitespace"
 id = "end-of-file-fixer"
 
 [[repos]]
-repo = "https://github.com/bneijt/deno-pre-commit"
-rev = "2.8.3"
+repo = "local"
 [[repos.hooks]]
 id = "deno-fmt"
-[[repos.hooks]]
-id = "deno-lint"
-
-[[repos]]
-repo = "local"
+name = "deno fmt"
+language = "system"
+types = ["json", "markdown"]
+pass_filenames = false
+entry = "deno fmt"
 [[repos.hooks]]
 id = "cargo-fmt"
 name = "cargo fmt"
