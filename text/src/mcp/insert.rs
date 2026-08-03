@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, not_found_or_io, refuse_justfile_write};
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,7 +8,7 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
-use std::fs;
+use std::io::Write;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct InsertInput {
@@ -26,8 +26,9 @@ impl McpService {
         Parameters(input): Parameters<InsertInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        refuse_justfile_write(&path)?;
-        let content = fs::read_to_string(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
+        let content = path
+            .read_to_string()
+            .map_err(|e| not_found_or_io(&path, e))?;
 
         let mut lines: Vec<&str> = content.lines().collect();
         if input.insert_line > lines.len() {
@@ -45,10 +46,13 @@ impl McpService {
         if content.ends_with('\n') {
             updated.push('\n');
         }
-        fs::write(path.as_path(), updated)
-            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
+        let write = path.into_write_buffer()?;
+        write
+            .open()
+            .and_then(|mut file| file.write_all(updated.as_bytes()))
+            .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "inserted after line {} in {path}",
+            "inserted after line {} in {write}",
             input.insert_line
         ))]))
     }

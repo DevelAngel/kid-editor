@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, not_found_or_io};
+use super::workspace_path::{UnresolvedPath, WorkspacePath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,8 +8,7 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
-use std::fs;
-use std::path::Path;
+use std::fs::{self, ReadDir};
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct TreeInput {
@@ -30,22 +29,15 @@ impl McpService {
         let resolved = input
             .path
             .map(|p| p.resolve(&self.workspace_root, &self.ignore))
-            .transpose()?;
-        // `resolved` stays a `WorkspacePath` (or absent, meaning "the
-        // workspace root itself" — already trusted, nothing to resolve)
-        // for its whole lifetime here; only borrow from it at the point of
-        // use, never take it apart into loose `PathBuf`/`String` values.
-        let root: &Path = resolved
-            .as_ref()
-            .map_or(&self.workspace_root, |w| w.as_path());
-        let display = resolved
-            .as_ref()
-            .map_or_else(|| ".".to_owned(), ToString::to_string);
+            .transpose()?
+            .unwrap_or_else(|| WorkspacePath::root(&self.workspace_root));
 
-        let metadata = fs::metadata(root).map_err(|e| not_found_or_io(&display, e))?;
+        let metadata = resolved
+            .metadata()
+            .map_err(|e| not_found_or_io(&resolved, e))?;
         if !metadata.is_dir() {
             return Err(McpError::invalid_params(
-                format!("{display} is not a directory"),
+                format!("{resolved} is not a directory"),
                 None,
             ));
         }
@@ -53,8 +45,11 @@ impl McpService {
         let mut out = String::from(".\n");
         let mut dirs = 0usize;
         let mut files = 0usize;
+        let root_entries = resolved
+            .read_dir()
+            .map_err(|e| McpError::internal_error(format!("{resolved}: {e}"), None))?;
         build_tree(
-            root,
+            root_entries,
             "",
             input.max_depth,
             &self.ignore,
@@ -72,12 +67,18 @@ impl McpService {
     }
 }
 
-/// Recursively renders `dir`'s contents in the style of the Unix `tree`
+/// Recursively renders `entries`' contents in the style of the Unix `tree`
 /// command (`├──`, `└──`, `│   ` continuation prefixes), depth-first,
 /// directories and files sorted together by name. Counts are accumulated
 /// into `dirs`/`files` as it goes.
+///
+/// Only the top-level `ReadDir` comes from a resolved [`WorkspacePath`];
+/// every recursive step below it reads a subdirectory the top level itself
+/// already reported, so there is nothing left to re-resolve or re-check —
+/// the ignore-name filter below is reapplied at every level regardless,
+/// exactly as it always was.
 fn build_tree(
-    dir: &Path,
+    entries: ReadDir,
     prefix: &str,
     remaining_depth: Option<usize>,
     ignore: &[String],
@@ -85,8 +86,7 @@ fn build_tree(
     dirs: &mut usize,
     files: &mut usize,
 ) -> Result<(), McpError> {
-    let mut entries: Vec<_> = fs::read_dir(dir)
-        .map_err(|e| McpError::internal_error(format!("{}: {e}", dir.display()), None))?
+    let mut entries: Vec<_> = entries
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
             let name = entry.file_name();
@@ -117,8 +117,11 @@ fn build_tree(
             if descend {
                 let child_prefix = format!("{prefix}{}", if is_last { "    " } else { "│   " });
                 let next_depth = remaining_depth.map(|d| d - 1);
+                let child_entries = fs::read_dir(entry.path()).map_err(|e| {
+                    McpError::internal_error(format!("{}: {e}", entry.path().display()), None)
+                })?;
                 build_tree(
-                    &entry.path(),
+                    child_entries,
                     &child_prefix,
                     next_depth,
                     ignore,

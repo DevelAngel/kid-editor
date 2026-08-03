@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, refuse_justfile_write};
+use super::workspace_path::UnresolvedPath;
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,7 +8,7 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
-use std::fs;
+use std::io::Write;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CreateInput {
@@ -27,15 +27,13 @@ impl McpService {
         Parameters(input): Parameters<CreateInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        refuse_justfile_write(&path)?;
-        if let Some(parent) = path.as_path().parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
-        }
-        fs::write(path.as_path(), &input.file_text)
-            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
+        let write = path.into_write_buffer()?;
+        write
+            .open()
+            .and_then(|mut file| file.write_all(input.file_text.as_bytes()))
+            .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "wrote {path}"
+            "wrote {write}"
         ))]))
     }
 }

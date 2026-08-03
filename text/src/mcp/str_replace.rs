@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, not_found_or_io, refuse_justfile_write};
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,7 +8,7 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
-use std::fs;
+use std::io::Write;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct StrReplaceInput {
@@ -28,8 +28,9 @@ impl McpService {
         Parameters(input): Parameters<StrReplaceInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        refuse_justfile_write(&path)?;
-        let content = fs::read_to_string(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
+        let content = path
+            .read_to_string()
+            .map_err(|e| not_found_or_io(&path, e))?;
 
         let occurrences = content.matches(input.old_str.as_str()).count();
         if occurrences == 0 {
@@ -48,10 +49,13 @@ impl McpService {
         }
 
         let updated = content.replacen(&input.old_str, &input.new_str, 1);
-        fs::write(path.as_path(), updated)
-            .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
+        let write = path.into_write_buffer()?;
+        write
+            .open()
+            .and_then(|mut file| file.write_all(updated.as_bytes()))
+            .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "replaced 1 occurrence in {path}"
+            "replaced 1 occurrence in {write}"
         ))]))
     }
 }

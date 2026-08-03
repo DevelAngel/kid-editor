@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, not_found_or_io};
+use super::workspace_path::{UnresolvedPath, WorkspacePath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -7,9 +7,6 @@ use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError};
 use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
-
-use std::fs;
-use std::path::Path;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ViewInput {
@@ -27,7 +24,7 @@ impl McpService {
     )]
     fn view(&self, Parameters(input): Parameters<ViewInput>) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        let metadata = fs::metadata(path.as_path()).map_err(|e| not_found_or_io(&path, e))?;
+        let metadata = path.metadata().map_err(|e| not_found_or_io(&path, e))?;
 
         if metadata.is_dir() {
             if input.view_range.is_some() {
@@ -37,11 +34,12 @@ impl McpService {
                 ));
             }
             return Ok(CallToolResult::success(vec![ContentBlock::text(
-                list_directory(path.as_path())?,
+                list_directory(&path)?,
             )]));
         }
 
-        let content = fs::read_to_string(path.as_path())
+        let content = path
+            .read_to_string()
             .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
         let text = render_numbered(&content, input.view_range)?;
         Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
@@ -73,9 +71,10 @@ fn render_numbered(content: &str, view_range: Option<[usize; 2]>) -> Result<Stri
     Ok(out)
 }
 
-fn list_directory(path: &Path) -> Result<String, McpError> {
-    let mut entries: Vec<String> = std::fs::read_dir(path)
-        .map_err(|e| McpError::internal_error(format!("{}: {e}", path.display()), None))?
+fn list_directory(path: &WorkspacePath) -> Result<String, McpError> {
+    let mut entries: Vec<String> = path
+        .read_dir()
+        .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?
         .filter_map(|entry| entry.ok())
         .map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();

@@ -17,20 +17,34 @@
 //!   way to construct one — no `From`, no public field. Holding a
 //!   `WorkspacePath` *is* holding the guarantee; there's nothing left for
 //!   a tool to check, and nothing for it to forget to check.
+//! - [`WriteBuffer`] is the proof that a `WorkspacePath` additionally
+//!   isn't the workspace's `justfile` (see ADR 0003). The only way to
+//!   obtain one is [`WorkspacePath::into_write_buffer`], and the only
+//!   thing it offers back is [`WriteBuffer::open`] — a `std::fs::File`,
+//!   nothing that hands out a raw path. A tool that never converts to a
+//!   `WriteBuffer` simply has no way to write anything; the check isn't
+//!   something it could forget.
 //!
 //! **Do not deconstruct a `WorkspacePath` into its parts.** Something like
-//! `(path.as_path().to_path_buf(), path.to_string())` hands out a plain
+//! `(path.absolute_field, path.to_string())` would hand out a plain
 //! `PathBuf` and a plain `String` that no longer carry any proof of
 //! anything — they're indistinguishable, at the type level, from a path
-//! nobody ever checked. Keep the `WorkspacePath` itself in scope and use
-//! [`WorkspacePath::as_path`] (for `std::fs` calls) or its `Display` impl
-//! (for messages) at the point of use.
+//! nobody ever checked. Keep the `WorkspacePath` (or `WriteBuffer`) itself
+//! in scope and use its dedicated accessors ([`WorkspacePath::metadata`],
+//! [`WorkspacePath::read_dir`], [`WorkspacePath::read_to_string`],
+//! [`WriteBuffer::open`]) or its `Display` impl (for messages) at the
+//! point of use. There is no accessor that hands out a raw `&Path` at
+//! all — `tree`'s recursive descent below the first level reads
+//! subdirectories via `std::fs` directly, on paths `fs::read_dir` itself
+//! already reported, never on anything derived from a `WorkspacePath`.
 
 use rmcp::model::ErrorData as McpError;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
 use std::fmt::{self, Display, Formatter};
+use std::fs::{self, File, Metadata, OpenOptions, ReadDir};
+use std::io;
 use std::path::{Component, Path, PathBuf};
 
 /// A path exactly as a tool received it over the wire: unchecked, and
@@ -176,26 +190,91 @@ impl WorkspacePath {
         Ok(Self { relative, absolute })
     }
 
-    /// The validated, absolute path — safe to hand to any `std::fs` call.
-    pub fn as_path(&self) -> &Path {
+    /// The [`WorkspacePath`] denoting the workspace root itself — what
+    /// `tree`'s `path: None` means. Not a general-purpose constructor:
+    /// `relative` is empty on purpose, which only makes sense for "no
+    /// path given, use the root".
+    pub(super) fn root(workspace_root: &Path) -> Self {
+        Self {
+            relative: PathBuf::new(),
+            absolute: workspace_root.to_path_buf(),
+        }
+    }
+
+    /// Test-only escape hatch so unit tests can assert on the resolved
+    /// absolute path directly, without needing a real file on disk for
+    /// every case. Never compiled into the actual server.
+    #[cfg(test)]
+    pub(super) fn absolute(&self) -> &Path {
         &self.absolute
+    }
+
+    /// `fs::metadata` on the validated path.
+    pub(super) fn metadata(&self) -> io::Result<Metadata> {
+        fs::metadata(&self.absolute)
+    }
+
+    /// `fs::read_dir` on the validated path.
+    pub(super) fn read_dir(&self) -> io::Result<ReadDir> {
+        fs::read_dir(&self.absolute)
+    }
+
+    /// `fs::read_to_string` on the validated path.
+    pub(super) fn read_to_string(&self) -> io::Result<String> {
+        fs::read_to_string(&self.absolute)
+    }
+
+    /// Converts this path into a [`WriteBuffer`], the only type any tool
+    /// can use to actually change file contents. Fails if the path names
+    /// the workspace's `justfile` — see ADR 0003. There is no other way
+    /// to obtain a `WriteBuffer`, so this check cannot be skipped by a
+    /// tool that forgets to call it: the tool has no path to write with
+    /// until it does.
+    pub(super) fn into_write_buffer(self) -> Result<WriteBuffer, McpError> {
+        if self.relative == Path::new("justfile") {
+            return Err(McpError::invalid_params(
+                format!("{self}: justfile is read-only through this server (see ADR 0003)"),
+                None,
+            ));
+        }
+        Ok(WriteBuffer(self))
     }
 }
 
-/// Refuses `path` if it names the workspace's `justfile`, independent of
-/// the ignore list. See ADR 0003: `just_run` executes recipes from this
-/// file, so nothing that can change file contents may touch it — but
-/// `view`/`tree` must keep reading it, since that's how an agent learns
-/// which recipes exist. Callers that write to the filesystem call this
-/// right after resolving the path; `view.rs` and `tree.rs` never call it.
-pub(super) fn refuse_justfile_write(path: &WorkspacePath) -> Result<(), McpError> {
-    if path.relative == Path::new("justfile") {
-        return Err(McpError::invalid_params(
-            format!("{path}: justfile is read-only through this server (see ADR 0003)"),
-            None,
-        ));
+/// A [`WorkspacePath`] proven *not* to name the workspace's `justfile`.
+/// The only way to obtain one is [`WorkspacePath::into_write_buffer`].
+/// This is the only type any tool can use to write file contents — it
+/// exposes [`WriteBuffer::open`], which returns a `std::fs::File`
+/// (`std::io::Write` and friends, straight from the standard library,
+/// nothing reimplemented here) and nothing that hands out a raw path, so
+/// nothing downstream of it can write anywhere the check didn't cover.
+#[derive(Debug)]
+pub struct WriteBuffer(WorkspacePath);
+
+impl WriteBuffer {
+    /// Opens the file for writing — truncated, created if missing, parent
+    /// directories created as needed (a no-op when they already exist, so
+    /// this is safe to call unconditionally for both new files (`create`)
+    /// and edits to existing ones (`insert`, `str_replace`)). Returns a
+    /// plain `std::fs::File`, which already implements `std::io::Write` —
+    /// nothing here reimplements that trait, this method only gates which
+    /// `File` a caller can ever get their hands on.
+    pub(super) fn open(&self) -> io::Result<File> {
+        if let Some(parent) = self.0.absolute.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&self.0.absolute)
     }
-    Ok(())
+}
+
+impl Display for WriteBuffer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
+    }
 }
 
 fn escapes_workspace(unresolved: &Path) -> McpError {
@@ -246,6 +325,7 @@ mod tests {
     use rmcp::model::ErrorCode;
     use std::assert_matches;
     use std::fs;
+    use std::io::Write;
     use std::os::unix;
 
     const EMPTY_IGNORE: &[String] = &[];
@@ -265,7 +345,7 @@ mod tests {
             UnresolvedPath::new(unresolved)
                 .resolve(root, EMPTY_IGNORE)
                 .unwrap()
-                .as_path()
+                .absolute()
                 .to_path_buf()
         }
         fn resolve_workspace_with_ignore(
@@ -276,7 +356,7 @@ mod tests {
             UnresolvedPath::new(unresolved)
                 .resolve(root, ignore)
                 .unwrap()
-                .as_path()
+                .absolute()
                 .to_path_buf()
         }
         fn resolve_fails(unresolved: impl Into<PathBuf>, root: &Path) -> McpError {
@@ -472,6 +552,65 @@ mod tests {
         assert_eq!(
             UnresolvedPath::resolve_workspace(UNRESOLVED, root.path()),
             root.join(UNRESOLVED)
+        );
+    }
+
+    #[test]
+    fn into_write_buffer_refuses_the_justfile() {
+        let root = TempDir::new().unwrap();
+        fs::write(root.path().join("justfile"), "check:\n\tcargo check\n").unwrap();
+        let path = UnresolvedPath::new("justfile")
+            .resolve(root.path(), EMPTY_IGNORE)
+            .unwrap();
+        assert_matches!(
+            path.into_write_buffer().unwrap_err(),
+            McpError {
+                code: ErrorCode::INVALID_PARAMS,
+                ..
+            }
+        );
+    }
+
+    #[test]
+    fn into_write_buffer_allows_other_files() {
+        let root = TempDir::new().unwrap();
+        let path = UnresolvedPath::new("notes.md")
+            .resolve(root.path(), EMPTY_IGNORE)
+            .unwrap();
+        let write = path.into_write_buffer().unwrap();
+        write.open().unwrap().write_all(b"hello").unwrap();
+        assert_eq!(
+            fs::read_to_string(root.path().join("notes.md")).unwrap(),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn write_buffer_creates_parent_directories() {
+        let root = TempDir::new().unwrap();
+        let path = UnresolvedPath::new("deep/nested/notes.md")
+            .resolve(root.path(), EMPTY_IGNORE)
+            .unwrap();
+        let write = path.into_write_buffer().unwrap();
+        write.open().unwrap().write_all(b"hello").unwrap();
+        assert_eq!(
+            fs::read_to_string(root.path().join("deep/nested/notes.md")).unwrap(),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn write_buffer_truncates_existing_content() {
+        let root = TempDir::new().unwrap();
+        fs::write(root.path().join("notes.md"), "old content, much longer").unwrap();
+        let path = UnresolvedPath::new("notes.md")
+            .resolve(root.path(), EMPTY_IGNORE)
+            .unwrap();
+        let write = path.into_write_buffer().unwrap();
+        write.open().unwrap().write_all(b"new").unwrap();
+        assert_eq!(
+            fs::read_to_string(root.path().join("notes.md")).unwrap(),
+            "new"
         );
     }
 
