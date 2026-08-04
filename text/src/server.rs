@@ -1,4 +1,4 @@
-use crate::mcp::{McpService, RecipeName};
+use crate::mcp::{IgnorePattern, McpService, RecipeName};
 use crate::oauth::{self, McpClientsConfig, McpOAuthStore};
 
 use anyhow::Result;
@@ -29,17 +29,17 @@ pub struct McpServer {
     #[builder(required)]
     base_url: Url,
     allowed_origins: Vec<Url>,
-    ignore: Vec<String>,
+    ignore: Vec<IgnorePattern>,
 }
 
 impl McpServer {
     pub async fn serve(self, addr: SocketAddr) -> Result<()> {
         tracing::warn!("Workspace: {}", self.workspace_root.display());
         tracing::warn!(
-            "Ignored (invisible to all tools): {}",
+            "Ignored patterns (invisible to all tools): {}",
             self.ignore
                 .iter()
-                .cloned()
+                .map(|p| p.to_string())
                 .reduce(|s, name| format!("{s} | {name}"))
                 .unwrap_or("none".to_owned())
         );

@@ -11,6 +11,7 @@ mod view;
 mod workspace_path;
 
 pub(crate) use just_run::{RecipeDescription, RecipeName};
+pub use workspace_path::IgnorePattern;
 
 use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -30,10 +31,11 @@ use std::path::PathBuf;
 #[derive(Clone)]
 pub struct McpService {
     workspace_root: PathBuf,
-    /// Names treated as nonexistent by every tool, e.g. ".git" or "target" —
-    /// not just hidden from `tree`, but unreadable, unwritable, and invisible
-    /// everywhere a path is resolved.
-    ignore: Vec<String>,
+    /// Glob patterns treated as nonexistent by every tool, e.g. ".git",
+    /// "target", or "*.log" — not just hidden from `tree`, but unreadable,
+    /// unwritable, and invisible everywhere a path is resolved. See
+    /// [`IgnorePattern`] for the matching rules.
+    ignore: Vec<IgnorePattern>,
     /// Recipes discovered once at construction time, with their `just
     /// --list` doc comment (empty if none). Empty map if the workspace
     /// has no `justfile`.
@@ -104,7 +106,7 @@ impl McpService {
     /// on every new connection would be wasted work.
     pub fn new(
         workspace_root: PathBuf,
-        ignore: Vec<String>,
+        ignore: Vec<IgnorePattern>,
         just_recipes: BTreeMap<RecipeName, RecipeDescription>,
     ) -> Self {
         let mut tool_router = Self::create_tool_router()

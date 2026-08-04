@@ -1,5 +1,5 @@
 use super::McpService;
-use super::workspace_path::{UnresolvedPath, WorkspacePath, not_found_or_io};
+use super::workspace_path::{IgnorePattern, UnresolvedPath, WorkspacePath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
@@ -42,21 +42,20 @@ impl McpService {
             ));
         }
 
-        let mut out = String::from(".\n");
-        let mut dirs = 0usize;
-        let mut files = 0usize;
+        let mut acc = TreeAccumulator {
+            out: String::from(".\n"),
+            dirs: 0,
+            files: 0,
+        };
         let root_entries = resolved
             .read_dir()
             .map_err(|e| McpError::internal_error(format!("{resolved}: {e}"), None))?;
-        build_tree(
-            root_entries,
-            "",
-            input.max_depth,
-            &self.ignore,
-            &mut out,
-            &mut dirs,
-            &mut files,
-        )?;
+        build_tree(root_entries, "", 0, input.max_depth, &self.ignore, &mut acc)?;
+        let TreeAccumulator {
+            mut out,
+            dirs,
+            files,
+        } = acc;
         out.push_str(&format!(
             "\n{dirs} director{}, {files} file{}\n",
             if dirs == 1 { "y" } else { "ies" },
@@ -67,10 +66,19 @@ impl McpService {
     }
 }
 
+/// Accumulates `build_tree`'s output and running counts across recursive
+/// calls — grouped into one struct so the recursion only threads one
+/// mutable argument instead of three.
+struct TreeAccumulator {
+    out: String,
+    dirs: usize,
+    files: usize,
+}
+
 /// Recursively renders `entries`' contents in the style of the Unix `tree`
 /// command (`├──`, `└──`, `│   ` continuation prefixes), depth-first,
 /// directories and files sorted together by name. Counts are accumulated
-/// into `dirs`/`files` as it goes.
+/// into `acc` as it goes.
 ///
 /// Only the top-level `ReadDir` comes from a resolved [`WorkspacePath`];
 /// every recursive step below it reads a subdirectory the top level itself
@@ -80,19 +88,19 @@ impl McpService {
 fn build_tree(
     entries: ReadDir,
     prefix: &str,
+    depth: usize,
     remaining_depth: Option<usize>,
-    ignore: &[String],
-    out: &mut String,
-    dirs: &mut usize,
-    files: &mut usize,
+    ignore: &[IgnorePattern],
+    acc: &mut TreeAccumulator,
 ) -> Result<(), McpError> {
     let mut entries: Vec<_> = entries
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
             let name = entry.file_name();
+            let name = name.to_string_lossy();
             !ignore
                 .iter()
-                .any(|ignored| ignored.as_str() == name.to_string_lossy())
+                .any(|pattern| pattern.matches_name_at_depth(&name, depth))
         })
         .collect();
     entries.sort_by_key(|entry| entry.file_name());
@@ -104,13 +112,13 @@ fn build_tree(
         let name = entry.file_name().to_string_lossy().into_owned();
         let is_dir = entry.path().is_dir();
 
-        out.push_str(prefix);
-        out.push_str(connector);
-        out.push_str(&name);
-        out.push('\n');
+        acc.out.push_str(prefix);
+        acc.out.push_str(connector);
+        acc.out.push_str(&name);
+        acc.out.push('\n');
 
         if is_dir {
-            *dirs += 1;
+            acc.dirs += 1;
             // `remaining_depth` counts levels still allowed to be *shown*.
             // At 1, this level was shown but its children are not.
             let descend = !matches!(remaining_depth, Some(d) if d <= 1);
@@ -123,15 +131,14 @@ fn build_tree(
                 build_tree(
                     child_entries,
                     &child_prefix,
+                    depth + 1,
                     next_depth,
                     ignore,
-                    out,
-                    dirs,
-                    files,
+                    acc,
                 )?;
             }
         } else {
-            *files += 1;
+            acc.files += 1;
         }
     }
     Ok(())
@@ -187,7 +194,7 @@ mod tests {
 
         let svc = McpService::new(
             dir.to_path_buf(),
-            vec![".git".to_string(), "target".to_string()],
+            vec![".git".parse().unwrap(), "target".parse().unwrap()],
             BTreeMap::new(),
         );
         let result = svc

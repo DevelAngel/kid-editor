@@ -1094,6 +1094,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "derive_more",
+ "glob",
  "indoc",
  "rmcp",
  "secrecy",

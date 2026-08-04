@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.3.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.2.0..v0.3.0) - 2026-08-04
+
+### Documentation
+
+- add sandboxed just tool ADR - ([f60d3dc](https://github.com/DevelAngel/matrix-mcp/commit/f60d3dc581dd8776e10ca6f7f4244069ba23b6b4)) - Angelos Drossos
+- reduce src documentation - ([40f8ca8](https://github.com/DevelAngel/matrix-mcp/commit/40f8ca8472b7a300fa95a20ce680c8d484f3775a)) - Angelos Drossos
+
+### Features
+
+- add just_run tool - ([be4f1d1](https://github.com/DevelAngel/matrix-mcp/commit/be4f1d1c802429edf62a37c053195b3369568151)) - Angelos Drossos
+- refuse to write justfile - ([23a19c7](https://github.com/DevelAngel/matrix-mcp/commit/23a19c796ec49c4a6d8b8e6bd40cbbb4a2898181)) - Angelos Drossos
+- refuse to write justfile (BufWriter) - ([39e70bc](https://github.com/DevelAngel/matrix-mcp/commit/39e70bceb6333b9f4a4b8c8fda11c1cff5f21c76)) - Angelos Drossos
+- inject just recipes into tool desc - ([bff994b](https://github.com/DevelAngel/matrix-mcp/commit/bff994b9ccdda807125c10d29281e66a36ce1a3f)) - Angelos Drossos
+- inject just recipes incl. description - ([5345db5](https://github.com/DevelAngel/matrix-mcp/commit/5345db5343f4d76d0fef8083019e367c58c4ded7)) - Angelos Drossos
+- add justfile to ignore list - ([9152765](https://github.com/DevelAngel/matrix-mcp/commit/9152765371040842cb3e78d6b2f0fbe3b464cc8d)) - Angelos Drossos
+- add extra-ignore CLI option - ([7be83e2](https://github.com/DevelAngel/matrix-mcp/commit/7be83e2b7e30c24acc75d05749193bc6bcec3b49)) - Angelos Drossos
+
 ## [0.2.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.1.0..v0.2.0) - 2026-08-03
 
 ### Documentation

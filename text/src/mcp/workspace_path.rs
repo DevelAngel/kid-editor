@@ -16,6 +16,7 @@
 //! loose `PathBuf` carries none of this proof. Use its accessors or
 //! `Display` at the point of use instead.
 
+use glob::{Pattern, PatternError};
 use rmcp::model::ErrorData as McpError;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
@@ -24,6 +25,72 @@ use std::fmt::{self, Display, Formatter};
 use std::fs::{self, File, Metadata, OpenOptions, ReadDir};
 use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::str::FromStr;
+
+/// A single `--ignore`/`--extra-ignore` entry: a glob pattern, optionally
+/// anchored to the workspace's top level with a leading `/`.
+///
+/// Parsing (via [`FromStr`], used by clap's derive) is the only way to
+/// build one — an invalid glob is therefore rejected at CLI-parse time,
+/// not silently swallowed the first time a path happens to be checked
+/// against it.
+#[derive(Clone, Debug)]
+pub struct IgnorePattern {
+    /// `true` if the pattern had a leading `/`: matched only against a
+    /// path's first component. `false`: matched against every component,
+    /// at any depth.
+    anchored: bool,
+    glob: Pattern,
+}
+
+impl IgnorePattern {
+    /// Checks a single directory entry's name against this pattern, for
+    /// callers like `tree` that see one path component per entry rather
+    /// than a full relative path. `depth` is how many directories deep
+    /// `name` sits below the workspace root (0 = a direct child of the
+    /// root) — an anchored pattern only ever matches at depth 0, same as
+    /// [`IgnorePattern::matches`] only checking a `WorkspacePath`'s first
+    /// component.
+    pub(super) fn matches_name_at_depth(&self, name: &str, depth: usize) -> bool {
+        if self.anchored && depth != 0 {
+            return false;
+        }
+        self.glob.matches(name)
+    }
+
+    fn matches(&self, relative: &Path) -> bool {
+        let mut components = relative
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy());
+        if self.anchored {
+            components.next().is_some_and(|c| self.glob.matches(&c))
+        } else {
+            components.any(|c| self.glob.matches(&c))
+        }
+    }
+}
+
+impl Display for IgnorePattern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.anchored {
+            write!(f, "/")?;
+        }
+        write!(f, "{}", self.glob.as_str())
+    }
+}
+
+impl FromStr for IgnorePattern {
+    type Err = PatternError;
+
+    fn from_str(pattern: &str) -> Result<Self, Self::Err> {
+        let (anchored, pattern) = match pattern.strip_prefix('/') {
+            Some(rest) => (true, rest),
+            None => (false, pattern),
+        };
+        let glob = Pattern::new(pattern)?;
+        Ok(Self { anchored, glob })
+    }
+}
 
 /// A path exactly as a tool received it over the wire: unchecked, and
 /// deliberately inert. [`resolve`](UnresolvedPath::resolve) is the only
@@ -46,7 +113,7 @@ impl UnresolvedPath {
     pub fn resolve(
         self,
         workspace_root: &Path,
-        ignore: &[String],
+        ignore: &[IgnorePattern],
     ) -> Result<WorkspacePath, McpError> {
         WorkspacePath::new(self, workspace_root, ignore)
     }
@@ -97,9 +164,9 @@ impl WorkspacePath {
     /// UNC path, ...) is rejected outright rather than guessed at; (2) `..`
     /// is resolved lexically, and rejected if it has nothing left to pop,
     /// no matter how deep the redirection (`a/../../b` is caught exactly
-    /// like `../b`); (3) any path component matching `ignore` is rejected
-    /// the same way a nonexistent path would be — see [`not_found_or_io`]
-    /// for why.
+    /// like `../b`); (3) any path component matching an [`IgnorePattern`]
+    /// in `ignore` is rejected the same way a nonexistent path would be —
+    /// see [`not_found_or_io`] for why.
     ///
     /// Symlinks are deliberately **not** resolved or checked here: no tool
     /// in this module can create one, so the only way one can exist inside
@@ -109,7 +176,7 @@ impl WorkspacePath {
     pub fn new(
         unresolved: UnresolvedPath,
         workspace_root: &Path,
-        ignore: &[String],
+        ignore: &[IgnorePattern],
     ) -> Result<Self, McpError> {
         // Lexically collapse `.` and `..` in path.
         let Some(unresolved) = unresolved.normalise() else {
@@ -128,11 +195,8 @@ impl WorkspacePath {
             return Err(escapes_workspace(&relative));
         }
 
-        // No component may match an ignored name.
-        if relative
-            .components()
-            .any(|c| ignore.iter().any(|name| name.as_str() == c.as_os_str()))
-        {
+        // No component may match an ignored pattern.
+        if ignore.iter().any(|pattern| pattern.matches(&relative)) {
             return Err(McpError::invalid_params(
                 format!("{}: no such file or directory", display_relative(&relative)),
                 None,
@@ -264,11 +328,14 @@ mod tests {
     use std::io::Write;
     use std::os::unix;
 
-    const EMPTY_IGNORE: &[String] = &[];
+    const EMPTY_IGNORE: &[IgnorePattern] = &[];
 
-    // fn resolve(input: &str, root: &Path, ignore: &[String]) -> Result<WorkspacePath, McpError> {
-    //     WorkspacePath::new(PathBuf::from(input), root, ignore)
-    // }
+    /// Parses each `&str` into an [`IgnorePattern`], panicking on an
+    /// invalid glob — fine for tests, where the whole point is that
+    /// production code never gets this far with a bad pattern.
+    fn ignore_patterns(patterns: &[&str]) -> Vec<IgnorePattern> {
+        patterns.iter().map(|p| p.parse().unwrap()).collect()
+    }
 
     impl UnresolvedPath {
         fn resolve_relative(unresolved: impl Into<PathBuf>, root: &Path) -> String {
@@ -287,7 +354,7 @@ mod tests {
         fn resolve_workspace_with_ignore(
             unresolved: impl Into<PathBuf>,
             root: &Path,
-            ignore: &[String],
+            ignore: &[IgnorePattern],
         ) -> PathBuf {
             UnresolvedPath::new(unresolved)
                 .resolve(root, ignore)
@@ -303,7 +370,7 @@ mod tests {
         fn resolve_with_irgnore_fails(
             unresolved: impl Into<PathBuf>,
             root: &Path,
-            ignore: &[String],
+            ignore: &[IgnorePattern],
         ) -> McpError {
             UnresolvedPath::new(unresolved)
                 .resolve(root, ignore)
@@ -396,7 +463,7 @@ mod tests {
     #[test]
     fn rejects_ignored_top_level_entry() {
         let unresolved = &PathBuf::from(".git");
-        let ignore = vec![".git".to_string()];
+        let ignore = ignore_patterns(&[".git"]);
         let root = TempDir::new().unwrap();
         assert_matches!(
             UnresolvedPath::resolve_with_irgnore_fails(unresolved, root.path(), &ignore),
@@ -421,7 +488,7 @@ mod tests {
     #[test]
     fn rejects_path_nested_under_ignored_directory() {
         let unresolved = &PathBuf::from("target/debug/deep/file.txt");
-        let ignore = vec!["target".to_string()];
+        let ignore = ignore_patterns(&["target"]);
         let root = TempDir::new().unwrap();
         assert_matches!(
             UnresolvedPath::resolve_with_irgnore_fails(unresolved, root.path(), &ignore),
@@ -435,12 +502,76 @@ mod tests {
     #[test]
     fn allows_entry_not_matching_ignore_list() {
         const UNRESOLVED: &str = "src/main.rs";
-        let ignore = vec!["target".to_string()];
+        let ignore = ignore_patterns(&["target"]);
         let root = TempDir::new().unwrap();
         assert_eq!(
             UnresolvedPath::resolve_workspace_with_ignore(UNRESOLVED, root.path(), &ignore),
             root.path().join(UNRESOLVED)
         );
+    }
+
+    #[test]
+    fn unanchored_glob_pattern_matches_any_depth() {
+        let ignore = ignore_patterns(&["*.log"]);
+        let root = TempDir::new().unwrap();
+        assert_matches!(
+            UnresolvedPath::resolve_with_irgnore_fails("debug.log", root.path(), &ignore),
+            McpError {
+                code: ErrorCode::INVALID_PARAMS,
+                ..
+            }
+        );
+        assert_matches!(
+            UnresolvedPath::resolve_with_irgnore_fails(
+                "nested/deep/debug.log",
+                root.path(),
+                &ignore
+            ),
+            McpError {
+                code: ErrorCode::INVALID_PARAMS,
+                ..
+            }
+        );
+    }
+
+    #[test]
+    fn anchored_pattern_only_matches_top_level() {
+        let ignore = ignore_patterns(&["/justfile"]);
+        let root = TempDir::new().unwrap();
+        assert_matches!(
+            UnresolvedPath::resolve_with_irgnore_fails("justfile", root.path(), &ignore),
+            McpError {
+                code: ErrorCode::INVALID_PARAMS,
+                ..
+            }
+        );
+        assert_eq!(
+            UnresolvedPath::resolve_workspace_with_ignore("sub/justfile", root.path(), &ignore),
+            root.path().join("sub/justfile")
+        );
+    }
+
+    #[test]
+    fn anchored_glob_pattern_matches_top_level_only() {
+        let ignore = ignore_patterns(&["/*.log"]);
+        let root = TempDir::new().unwrap();
+        assert_matches!(
+            UnresolvedPath::resolve_with_irgnore_fails("debug.log", root.path(), &ignore),
+            McpError {
+                code: ErrorCode::INVALID_PARAMS,
+                ..
+            }
+        );
+        assert_eq!(
+            UnresolvedPath::resolve_workspace_with_ignore("nested/debug.log", root.path(), &ignore),
+            root.path().join("nested/debug.log")
+        );
+    }
+
+    #[test]
+    fn invalid_glob_pattern_is_rejected_at_parse_time() {
+        assert!("[".parse::<IgnorePattern>().is_err());
+        assert!("/[".parse::<IgnorePattern>().is_err());
     }
 
     #[test]

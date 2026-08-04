@@ -4,6 +4,8 @@ use clap::{ArgGroup, Args};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use url::Url;
 
+use crate::mcp::IgnorePattern;
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
@@ -31,25 +33,29 @@ pub struct Cli {
     #[cfg_attr(debug_assertions, clap(default_value = "http://localhost/"))]
     pub allowed_origins: Vec<Url>,
 
-    /// Directory/file names invisible to every tool — treated as nonexistent,
-    /// not just hidden from `tree`, e.g. ".git" or "target".
-    /// Can be repeated or comma-separated.
+    /// Directory/file glob patterns invisible to every tool — treated as
+    /// nonexistent, not just hidden from `tree`, e.g. ".git", "target", or
+    /// "*.log". Matched against every path component at any depth unless
+    /// prefixed with "/", which anchors the pattern to the workspace's
+    /// top level only (e.g. "/justfile" hides just the top-level file,
+    /// not "sub/justfile"). Can be repeated or comma-separated.
     #[clap(
         long,
-        value_name = "PATH",
+        value_name = "PATTERN",
         value_delimiter = ',',
         value_hint = ValueHint::AnyPath,
         default_value = ".git,.hg,.svn,.jj,target,node_modules,.venv,venv,\
                           __pycache__,.mypy_cache,.pytest_cache,.ruff_cache,\
-                          dist,build,.next,.idea,.vscode,.DS_Store,justfile"
+                          dist,build,.next,.idea,.vscode,.DS_Store,/justfile"
     )]
-    pub ignore: Vec<String>,
+    pub ignore: Vec<IgnorePattern>,
 
-    /// Additional names appended to `--ignore`'s list (default or custom),
-    /// instead of replacing it. Use this to add names without having to
-    /// repeat the whole default list. Can be repeated or comma-separated.
-    #[clap(long = "extra-ignore", value_name = "NAME", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
-    pub extra_ignore: Vec<String>,
+    /// Additional glob patterns appended to `--ignore`'s list (default or
+    /// custom), instead of replacing it. Use this to add patterns without
+    /// having to repeat the whole default list. Same syntax as `--ignore`.
+    /// Can be repeated or comma-separated.
+    #[clap(long = "extra-ignore", value_name = "PATTERN", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
+    pub extra_ignore: Vec<IgnorePattern>,
 
     #[command(flatten)]
     pub oauth: OauthOptions,
