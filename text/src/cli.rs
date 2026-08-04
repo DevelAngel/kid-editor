@@ -1,5 +1,5 @@
 pub use clap::Parser;
-use clap::ValueHint::{DirPath, FilePath};
+use clap::ValueHint;
 use clap::{ArgGroup, Args};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use url::Url;
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[clap(group = ArgGroup::new("oauth").required(true).args(&["oauth-disabled", "oauth-clients-file"]))]
 pub struct Cli {
     /// Sets the workspace which will be served
-    #[clap(value_name = "DIR", value_hint = DirPath)]
+    #[clap(value_name = "DIR", value_hint = ValueHint::DirPath)]
     pub workspace_root: PathBuf,
 
     /// Sets the address the MCP server listens on.
@@ -22,12 +22,12 @@ pub struct Cli {
 
     /// This server's own public URL, used when issuing OAuth metadata
     /// (issuer, authorization/token endpoints), e.g. "https://mcp.example.com".
-    #[clap(long, value_name = "URL", default_value = "http://localhost:9300")]
+    #[clap(long, value_name = "URL", value_hint = ValueHint::Url, default_value = "http://localhost:9300")]
     pub base_url: Url,
 
     /// Origins allowed to access the MCP server cross-origin, e.g.
     /// "https://example.ai". Can be repeated or comma-separated.
-    #[clap(long = "allowed-origin", value_name = "URL", value_delimiter = ',')]
+    #[clap(long = "allowed-origin", value_name = "URL", value_hint = ValueHint::Url, value_delimiter = ',')]
     #[cfg_attr(debug_assertions, clap(default_value = "http://localhost/"))]
     pub allowed_origins: Vec<Url>,
 
@@ -35,14 +35,21 @@ pub struct Cli {
     /// not just hidden from `tree`, e.g. ".git" or "target".
     /// Can be repeated or comma-separated.
     #[clap(
-        long = "ignore",
-        value_name = "NAME",
+        long,
+        value_name = "PATH",
         value_delimiter = ',',
+        value_hint = ValueHint::AnyPath,
         default_value = ".git,.hg,.svn,.jj,target,node_modules,.venv,venv,\
                           __pycache__,.mypy_cache,.pytest_cache,.ruff_cache,\
-                          dist,build,.next,.idea,.vscode,.DS_Store"
+                          dist,build,.next,.idea,.vscode,.DS_Store,justfile"
     )]
     pub ignore: Vec<String>,
+
+    /// Additional names appended to `--ignore`'s list (default or custom),
+    /// instead of replacing it. Use this to add names without having to
+    /// repeat the whole default list. Can be repeated or comma-separated.
+    #[clap(long = "extra-ignore", value_name = "NAME", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
+    pub extra_ignore: Vec<String>,
 
     #[command(flatten)]
     pub oauth: OauthOptions,
@@ -60,6 +67,6 @@ pub struct OauthOptions {
     /// TOML file listing MCP clients allowed to authenticate against the MCP server
     /// If unset or empty, MCP OAuth is effectively disabled:
     /// no client can complete the authorization flow.
-    #[arg(long, value_name = "FILE", value_hint = FilePath, id = "oauth-clients-file")]
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, id = "oauth-clients-file")]
     pub clients_file: Option<std::path::PathBuf>,
 }
