@@ -1,14 +1,9 @@
 //! Runs `just` recipes inside the workspace, without ever letting a
 //! client choose *which* `justfile` or *which* directory that means.
-//!
-//! The set of runnable recipes is discovered once, at
-//! [`McpService::new`](super::McpService::new) time, straight from
-//! `just --summary`. A [`RecipeName`] can only be constructed by that
-//! discovery step or by `serde` deserializing a tool call — there is no
-//! public way to build one out of an arbitrary string, so nothing here
-//! can accidentally skip the "does this recipe actually exist" check.
-//! See ADR 0003 for the reasoning behind the boundary this module
-//! enforces.
+//! [`RecipeName`] can only be built by discovery or by `serde`
+//! deserializing a tool call — no public way to construct one out of an
+//! arbitrary string, so the "does this recipe exist" check can't be
+//! skipped. See ADR 0003.
 
 use super::McpService;
 
@@ -29,20 +24,17 @@ use std::process::{Command, Output};
 /// response.
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 
-/// The name of a recipe that `just --summary` actually reported for this
-/// workspace's `justfile`. Deliberately not `String`: holding one is
-/// meant to *be* the proof that the recipe exists, the same way
-/// `WorkspacePath` is the proof a path was checked.
+/// A recipe `just --summary` reported for this workspace's `justfile`.
+/// Deliberately not `String`: holding one *is* the proof it exists, the
+/// same way `WorkspacePath` is the proof a path was checked.
 #[derive(Clone, Debug, Deref, Display, Eq, PartialEq, Hash, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct RecipeName(String);
 
 impl RecipeName {
-    /// Runs `just --summary` against `justfile_path` and collects every
-    /// recipe name it reports. Returns an empty set if there is no
-    /// `justfile` to list, or if `just` itself isn't available — either
-    /// way, the caller ends up offering no recipes, which is the same
-    /// as offering no tool at all.
+    /// Empty set if there is no `justfile`, or if `just` isn't available —
+    /// either way, the caller ends up offering no recipes, same as
+    /// offering no tool at all.
     pub fn discover(workspace_root: &Path) -> HashSet<Self> {
         let justfile_path = workspace_root.join("justfile");
         if !justfile_path.is_file() {
@@ -74,14 +66,8 @@ impl RecipeName {
     }
 }
 
-/// Parses `just --summary` output:
-/// Each recipe is divided by a whitespace.
-///
-/// Example:
-/// ```console
-/// $ just --summary --unsorted --no-aliases --justfile ./justfile
-/// check lint test test-one debug-native release-native release-cross
-/// ```
+/// `just --summary --unsorted --no-aliases` prints recipe names separated
+/// by plain whitespace on one line — no per-line parsing needed.
 fn parse_recipe_list(stdout: &[u8]) -> HashSet<RecipeName> {
     String::from_utf8_lossy(stdout)
         .split_ascii_whitespace()

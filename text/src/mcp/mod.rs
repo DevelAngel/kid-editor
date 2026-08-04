@@ -28,8 +28,8 @@ pub struct McpService {
     /// not just hidden from `tree`, but unreadable, unwritable, and invisible
     /// everywhere a path is resolved.
     ignore: Vec<String>,
-    /// Just Recipes, discovered once at construction time.
-    /// Empty if the workspace has no `justfile`.
+    /// Recipes discovered once at construction time. Empty if the
+    /// workspace has no `justfile`.
     just_recipes: HashSet<RecipeName>,
     tool_router: ToolRouter<Self>,
 }
@@ -52,10 +52,8 @@ impl ServerHandler for McpService {
 
 impl McpService {
     /// `just_recipes` is discovered once by the caller (see
-    /// `McpServer::serve`), not per instance — `McpService::new` runs
-    /// once per client session, and re-running `just --summary` on every
-    /// new session would be wasted work for a result that can't change
-    /// mid-process.
+    /// `McpServer::serve`), not per session — re-running `just --summary`
+    /// on every new connection would be wasted work.
     pub fn new(
         workspace_root: PathBuf,
         ignore: Vec<String>,

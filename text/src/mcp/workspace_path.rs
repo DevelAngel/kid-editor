@@ -1,42 +1,20 @@
 //! The one law of this server: **no tool may touch a path outside the
 //! workspace root, or a path under an ignored name.** This module is the
-//! only place that law is allowed to be implemented. Every other module
-//! that touches `std::fs` receives a [`WorkspacePath`] and nothing else —
-//! never a raw string, never a `PathBuf` it computed itself.
+//! only place that law is implemented; every other module receives a
+//! [`WorkspacePath`] and never a raw string or self-built `PathBuf`.
 //!
-//! Two types carry the law:
+//! - [`UnresolvedPath`] is client input, unchecked. The only thing you can
+//!   do with one is call [`UnresolvedPath::resolve`].
+//! - [`WorkspacePath`] is the proof that check passed — no `From`, no
+//!   public field, no way to construct one that skipped it.
+//! - [`WriteBuffer`] additionally proves the path isn't the workspace's
+//!   `justfile` (ADR 0003). Only [`WorkspacePath::into_write_buffer`]
+//!   produces one, and it hands out no raw path — a tool that never
+//!   converts to a `WriteBuffer` has no way to write anything at all.
 //!
-//! - [`UnresolvedPath`] is what a tool's `#[derive(Deserialize)]` input
-//!   struct actually contains. It wraps the raw path exactly as the client
-//!   sent it — unchecked, and deliberately hard to misuse: it has no
-//!   `AsRef<Path>`, no `Display` usable for a file operation, nothing that
-//!   lets a tool reach the filesystem with it directly. The only thing you
-//!   can do with one is call [`UnresolvedPath::resolve`].
-//! - [`WorkspacePath`] is the proof that [`UnresolvedPath::resolve`] (or,
-//!   equivalently, [`WorkspacePath::new`]) succeeded. There is no other
-//!   way to construct one — no `From`, no public field. Holding a
-//!   `WorkspacePath` *is* holding the guarantee; there's nothing left for
-//!   a tool to check, and nothing for it to forget to check.
-//! - [`WriteBuffer`] is the proof that a `WorkspacePath` additionally
-//!   isn't the workspace's `justfile` (see ADR 0003). The only way to
-//!   obtain one is [`WorkspacePath::into_write_buffer`], and the only
-//!   thing it offers back is [`WriteBuffer::open`] — a `std::fs::File`,
-//!   nothing that hands out a raw path. A tool that never converts to a
-//!   `WriteBuffer` simply has no way to write anything; the check isn't
-//!   something it could forget.
-//!
-//! **Do not deconstruct a `WorkspacePath` into its parts.** Something like
-//! `(path.absolute_field, path.to_string())` would hand out a plain
-//! `PathBuf` and a plain `String` that no longer carry any proof of
-//! anything — they're indistinguishable, at the type level, from a path
-//! nobody ever checked. Keep the `WorkspacePath` (or `WriteBuffer`) itself
-//! in scope and use its dedicated accessors ([`WorkspacePath::metadata`],
-//! [`WorkspacePath::read_dir`], [`WorkspacePath::read_to_string`],
-//! [`WriteBuffer::open`]) or its `Display` impl (for messages) at the
-//! point of use. There is no accessor that hands out a raw `&Path` at
-//! all — `tree`'s recursive descent below the first level reads
-//! subdirectories via `std::fs` directly, on paths `fs::read_dir` itself
-//! already reported, never on anything derived from a `WorkspacePath`.
+//! Don't deconstruct a `WorkspacePath`/`WriteBuffer` into its parts — a
+//! loose `PathBuf` carries none of this proof. Use its accessors or
+//! `Display` at the point of use instead.
 
 use rmcp::model::ErrorData as McpError;
 use rmcp::schemars::{self, JsonSchema};
@@ -48,14 +26,11 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 
 /// A path exactly as a tool received it over the wire: unchecked, and
-/// deliberately inert. It carries no method that reaches the filesystem —
-/// [`resolve`](UnresolvedPath::resolve) is the only door out, and it's a
-/// fallible one.
+/// deliberately inert. [`resolve`](UnresolvedPath::resolve) is the only
+/// door out, and it's a fallible one.
 ///
-/// The inner field is `pub(crate)` only so unit tests in sibling modules
-/// (`view.rs`, `tree.rs`, ...) can build fixtures directly; production
-/// code never has a reason to construct one by hand, since every instance
-/// that matters arrives via `serde` deserializing a tool call.
+/// The inner field is `pub(crate)` only so tests in sibling modules can
+/// build fixtures directly; production code always gets one via `serde`.
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct UnresolvedPath(PathBuf); // AI: Never make the PathBuf pub!
@@ -66,9 +41,8 @@ impl UnresolvedPath {
         Self(unresolved.into())
     }
 
-    /// Checks this path against `workspace_root` and `ignore` and, if it
-    /// passes, returns the [`WorkspacePath`] that's the only way to act on
-    /// it. See [`WorkspacePath::new`] for exactly what "passes" means.
+    /// Checks this path against `workspace_root` and `ignore`. See
+    /// [`WorkspacePath::new`] for what "passes" means.
     pub fn resolve(
         self,
         workspace_root: &Path,
@@ -77,13 +51,12 @@ impl UnresolvedPath {
         WorkspacePath::new(self, workspace_root, ignore)
     }
 
-    /// Lexically collapses `.` and `..` components, without touching the
-    /// filesystem — so this also works for paths that don't exist yet (e.g.
-    /// for `create`). Returns `None` if a `..` has nothing left to pop: unlike
-    /// a naive stack-based collapse that would just drop such a `..` silently,
-    /// that case means the path tries to step above where it started, and
-    /// silently dropping it would turn a workspace escape into a path that
-    /// merely *looks* safe.
+    /// Lexically collapses `.` and `..`, without touching the filesystem —
+    /// so this also works for paths that don't exist yet (`create`).
+    /// Returns `None` if a `..` has nothing left to pop: that means the
+    /// path steps above where it started, and silently dropping it (as a
+    /// naive stack-based collapse would) would turn a workspace escape
+    /// into a path that merely *looks* safe.
     fn normalise(&self) -> Option<PathBuf> {
         let mut out = PathBuf::new();
         for component in self.0.components() {
@@ -103,55 +76,36 @@ impl UnresolvedPath {
 
 /// A path proven to lie inside the workspace root and not under any
 /// ignored name. The only way to obtain one is [`WorkspacePath::new`] (or
-/// [`UnresolvedPath::resolve`], which just calls it). No `From`, no public
-/// field, no way to build one that skipped the check.
+/// [`UnresolvedPath::resolve`], which just calls it).
 #[derive(Debug)]
 pub struct WorkspacePath {
-    /// The path relative to the workspace root, after normalization —
-    /// e.g. `notes/todo.md`, never `/abs/...` and never containing `..`.
-    /// This is also what [`Display`] shows: the path in the vocabulary the
-    /// caller used, not an absolute filesystem path they never typed.
+    /// Relative to the workspace root, normalized — e.g. `notes/todo.md`,
+    /// never `/abs/...` and never containing `..`. Also what [`Display`]
+    /// shows: the path in the caller's own vocabulary.
     relative: PathBuf,
-    /// `workspace_root` joined with `relative` — the absolute path that's
-    /// actually safe to hand to `std::fs`. Computed once, here, and never
-    /// recomputed anywhere else.
+    /// `workspace_root` joined with `relative` — computed once, here.
     absolute: PathBuf,
 }
 
 impl WorkspacePath {
-    /// Resolves `unresolved` against `workspace_root`, which callers must
-    /// already have canonicalized (the server does this once at startup —
-    /// see `McpServer::serve`).
+    /// `workspace_root` must already be canonicalized (the server does
+    /// this once at startup — see `McpServer::serve`).
     ///
-    /// The check has three parts, in order:
+    /// Three checks, in order: (1) a leading `/` in the client path means
+    /// "relative to the workspace", not the real filesystem root — it's
+    /// stripped, and anything still absolute after that (a drive letter, a
+    /// UNC path, ...) is rejected outright rather than guessed at; (2) `..`
+    /// is resolved lexically, and rejected if it has nothing left to pop,
+    /// no matter how deep the redirection (`a/../../b` is caught exactly
+    /// like `../b`); (3) any path component matching `ignore` is rejected
+    /// the same way a nonexistent path would be — see [`not_found_or_io`]
+    /// for why.
     ///
-    /// 1. **Escape via an absolute path.** A client-supplied path is
-    ///    always relative to the workspace, never to the real filesystem —
-    ///    `/src/main.rs` means `<workspace>/src/main.rs`, not the real
-    ///    `/src/main.rs`. A single leading `/` is stripped to express
-    ///    that. Anything still absolute after that strip (a Windows drive
-    ///    letter, a UNC path, ...) is rejected outright rather than
-    ///    guessed at.
-    /// 2. **Escape via `..`.** The path is normalized lexically — `.` and
-    ///    `..` resolved without touching the filesystem, so this also
-    ///    works for paths that don't exist yet (`create`). If a `..` has
-    ///    nothing left to pop — the path tries to step above wherever it
-    ///    started — that's a traversal attempt and it's rejected, no
-    ///    matter how deep the redirection (`a/../../b` is caught exactly
-    ///    like `../b`).
-    /// 3. **An ignored name anywhere in the path.** If any component
-    ///    matches an entry in `ignore` (`.git`, `target`, ...), the path is
-    ///    rejected the same way a nonexistent path would be — see
-    ///    [`not_found_or_io`] for why that's deliberate.
-    ///
-    /// Symlinks are deliberately **not** resolved or checked here. No tool
-    /// in this module can create one — `create`/`str_replace`/`insert`
-    /// only ever write regular file content — so the only way a symlink
-    /// can exist inside the workspace is if whoever set the workspace up
-    /// put it there themselves, before the server ever ran. That's a prior
-    /// decision made outside this server, not something a client can
-    /// trigger through it, so it isn't this function's job to second-guess
-    /// it.
+    /// Symlinks are deliberately **not** resolved or checked here: no tool
+    /// in this module can create one, so the only way one can exist inside
+    /// the workspace is if whoever set the workspace up put it there
+    /// themselves — a decision made outside this server, not something a
+    /// client can trigger through it.
     pub fn new(
         unresolved: UnresolvedPath,
         workspace_root: &Path,
@@ -190,10 +144,8 @@ impl WorkspacePath {
         Ok(Self { relative, absolute })
     }
 
-    /// The [`WorkspacePath`] denoting the workspace root itself — what
-    /// `tree`'s `path: None` means. Not a general-purpose constructor:
-    /// `relative` is empty on purpose, which only makes sense for "no
-    /// path given, use the root".
+    /// The workspace root itself — what `tree`'s `path: None` means.
+    /// `relative` is empty on purpose; not a general-purpose constructor.
     pub(super) fn root(workspace_root: &Path) -> Self {
         Self {
             relative: PathBuf::new(),
@@ -201,35 +153,26 @@ impl WorkspacePath {
         }
     }
 
-    /// Test-only escape hatch so unit tests can assert on the resolved
-    /// absolute path directly, without needing a real file on disk for
-    /// every case. Never compiled into the actual server.
     #[cfg(test)]
     pub(super) fn absolute(&self) -> &Path {
         &self.absolute
     }
 
-    /// `fs::metadata` on the validated path.
     pub(super) fn metadata(&self) -> io::Result<Metadata> {
         fs::metadata(&self.absolute)
     }
 
-    /// `fs::read_dir` on the validated path.
     pub(super) fn read_dir(&self) -> io::Result<ReadDir> {
         fs::read_dir(&self.absolute)
     }
 
-    /// `fs::read_to_string` on the validated path.
     pub(super) fn read_to_string(&self) -> io::Result<String> {
         fs::read_to_string(&self.absolute)
     }
 
-    /// Converts this path into a [`WriteBuffer`], the only type any tool
-    /// can use to actually change file contents. Fails if the path names
-    /// the workspace's `justfile` — see ADR 0003. There is no other way
-    /// to obtain a `WriteBuffer`, so this check cannot be skipped by a
-    /// tool that forgets to call it: the tool has no path to write with
-    /// until it does.
+    /// Fails if this path names the workspace's `justfile` (ADR 0003).
+    /// There is no other way to obtain a [`WriteBuffer`], so this is not
+    /// something a tool could forget to check.
     pub(super) fn into_write_buffer(self) -> Result<WriteBuffer, McpError> {
         if self.relative == Path::new("justfile") {
             return Err(McpError::invalid_params(
@@ -242,23 +185,16 @@ impl WorkspacePath {
 }
 
 /// A [`WorkspacePath`] proven *not* to name the workspace's `justfile`.
-/// The only way to obtain one is [`WorkspacePath::into_write_buffer`].
-/// This is the only type any tool can use to write file contents — it
-/// exposes [`WriteBuffer::open`], which returns a `std::fs::File`
-/// (`std::io::Write` and friends, straight from the standard library,
-/// nothing reimplemented here) and nothing that hands out a raw path, so
-/// nothing downstream of it can write anywhere the check didn't cover.
+/// Only [`WorkspacePath::into_write_buffer`] produces one.
 #[derive(Debug)]
 pub struct WriteBuffer(WorkspacePath);
 
 impl WriteBuffer {
-    /// Opens the file for writing — truncated, created if missing, parent
-    /// directories created as needed (a no-op when they already exist, so
-    /// this is safe to call unconditionally for both new files (`create`)
-    /// and edits to existing ones (`insert`, `str_replace`)). Returns a
-    /// plain `std::fs::File`, which already implements `std::io::Write` —
-    /// nothing here reimplements that trait, this method only gates which
-    /// `File` a caller can ever get their hands on.
+    /// Opens the file truncated, creating it and its parent directories as
+    /// needed. Returns a plain `std::fs::File` — `std::io::Write` and
+    /// friends come straight from the standard library, nothing here
+    /// reimplements them; this method only gates which `File` a caller
+    /// can ever get.
     pub(super) fn open(&self) -> io::Result<File> {
         if let Some(parent) = self.0.absolute.parent() {
             fs::create_dir_all(parent)?;
