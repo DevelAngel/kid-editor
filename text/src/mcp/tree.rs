@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use indoc::indoc;
-    use std::collections::HashSet;
+    use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
@@ -152,7 +152,7 @@ mod tests {
         fs::create_dir(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("src/lib.rs"), "").unwrap();
 
-        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
+        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,
@@ -188,7 +188,7 @@ mod tests {
         let svc = McpService::new(
             dir.to_path_buf(),
             vec![".git".to_string(), "target".to_string()],
-            HashSet::new(),
+            BTreeMap::new(),
         );
         let result = svc
             .tree(Parameters(TreeInput {
@@ -218,7 +218,7 @@ mod tests {
         fs::create_dir_all(dir.path().join("a/b")).unwrap();
         fs::write(dir.path().join("a/b/deep.txt"), "").unwrap();
 
-        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
+        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,

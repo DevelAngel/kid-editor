@@ -62,13 +62,13 @@ impl McpService {
 mod tests {
     use super::*;
     use assert_fs::TempDir;
-    use std::collections::HashSet;
+    use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
     fn insert_adds_line_after_given_index() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
+        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.insert(Parameters(InsertInput {
             path: UnresolvedPath::new("f.txt"),

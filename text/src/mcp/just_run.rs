@@ -15,7 +15,7 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::Deserialize;
 
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -27,51 +27,104 @@ const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 /// A recipe `just --summary` reported for this workspace's `justfile`.
 /// Deliberately not `String`: holding one *is* the proof it exists, the
 /// same way `WorkspacePath` is the proof a path was checked.
-#[derive(Clone, Debug, Deref, Display, Eq, PartialEq, Hash, Deserialize, JsonSchema)]
+#[derive(
+    Clone, Debug, Deref, Display, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, JsonSchema,
+)]
 #[serde(transparent)]
 pub struct RecipeName(String);
 
+/// The doc comment `just --list` printed above a recipe, if any. Empty
+/// when the recipe has none — still listed, just undescribed.
+#[derive(Clone, Debug, Default, Deref, Display, Eq, PartialEq)]
+pub struct RecipeDescription(String);
+
 impl RecipeName {
-    /// Empty set if there is no `justfile`, or if `just` isn't available —
+    /// Empty map if there is no `justfile`, or if `just` isn't available —
     /// either way, the caller ends up offering no recipes, same as
     /// offering no tool at all.
-    pub fn discover(workspace_root: &Path) -> HashSet<Self> {
+    ///
+    /// `--summary` is the source of truth for which recipes exist;
+    /// `--list` only annotates that set with descriptions, so a recipe
+    /// `--list` doesn't describe still ends up in the map, just with an
+    /// empty [`RecipeDescription`].
+    pub fn discover(workspace_root: &Path) -> BTreeMap<Self, RecipeDescription> {
         let justfile_path = workspace_root.join("justfile");
         if !justfile_path.is_file() {
-            return HashSet::new();
+            return BTreeMap::new();
         }
 
-        let output = Command::new("just")
-            .arg("--summary")
-            .arg("--unsorted")
-            .arg("--no-aliases")
-            .arg("--justfile")
-            .arg(&justfile_path)
-            .output();
+        let names = run_just(&justfile_path, &["--summary", "--unsorted", "--no-aliases"])
+            .map(|stdout| parse_recipe_list(&stdout))
+            .unwrap_or_default();
+        if names.is_empty() {
+            return BTreeMap::new();
+        }
 
-        match output {
-            Ok(output) if output.status.success() => parse_recipe_list(&output.stdout),
-            Ok(output) => {
-                tracing::debug!(
-                    "`just --summary` failed, just_run tool disabled: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-                HashSet::new()
-            }
-            Err(e) => {
-                tracing::debug!("could not run `just --summary`, just_run tool disabled: {e}");
-                HashSet::new()
-            }
+        let mut descriptions = run_just(&justfile_path, &["--list", "--unsorted", "--no-aliases"])
+            .map(|stdout| parse_recipe_descriptions(&stdout))
+            .unwrap_or_default();
+
+        names
+            .into_keys()
+            .map(|name| {
+                let description = descriptions.remove(&name).unwrap_or_default();
+                (name, description)
+            })
+            .collect()
+    }
+}
+
+/// Runs `just` with the given args against `justfile_path`, returning
+/// stdout on success. Failures are logged and swallowed — a broken `just`
+/// invocation should degrade the feature, not crash the server.
+fn run_just(justfile_path: &Path, args: &[&str]) -> Option<Vec<u8>> {
+    let output = Command::new("just")
+        .args(args)
+        .arg("--justfile")
+        .arg(justfile_path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => Some(output.stdout),
+        Ok(output) => {
+            tracing::debug!(
+                "`just {args:?}` failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            None
+        }
+        Err(e) => {
+            tracing::debug!("could not run `just {args:?}`: {e}");
+            None
         }
     }
 }
 
 /// `just --summary --unsorted --no-aliases` prints recipe names separated
 /// by plain whitespace on one line — no per-line parsing needed.
-fn parse_recipe_list(stdout: &[u8]) -> HashSet<RecipeName> {
+fn parse_recipe_list(stdout: &[u8]) -> BTreeMap<RecipeName, ()> {
     String::from_utf8_lossy(stdout)
         .split_ascii_whitespace()
-        .map(|name| RecipeName(name.to_owned()))
+        .map(|name| (RecipeName(name.to_owned()), ()))
+        .collect()
+}
+
+/// `just --list --unsorted --no-aliases` prints one indented line per
+/// recipe: the name (plus any parameters), then optionally `# ` followed
+/// by its doc comment. The header line ("Available recipes:") and any
+/// line without a recognizable leading name are skipped.
+fn parse_recipe_descriptions(stdout: &[u8]) -> BTreeMap<RecipeName, RecipeDescription> {
+    String::from_utf8_lossy(stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut name_and_rest = line.trim().splitn(2, char::is_whitespace);
+            let name = name_and_rest.next()?.to_owned();
+            let description = line
+                .split_once('#')
+                .map(|(_, desc)| desc.trim().to_owned())
+                .unwrap_or_default();
+            Some((RecipeName(name), RecipeDescription(description)))
+        })
         .collect()
 }
 
@@ -83,14 +136,12 @@ struct JustRunInput {
 
 #[tool_router(router = just_run_tool_router, vis = "pub(super)")]
 impl McpService {
-    #[tool(
-        description = "Run a `just` recipe from the workspace's justfile (e.g. `check`, `test`, `lint`). Only available when the workspace has a justfile; only recipes it defines can be run."
-    )]
+    #[tool(description = "Run a `just` recipe.")]
     fn just_run(
         &self,
         Parameters(input): Parameters<JustRunInput>,
     ) -> Result<CallToolResult, McpError> {
-        if !self.just_recipes.contains(&input.recipe) {
+        if !self.just_recipes.contains_key(&input.recipe) {
             return Err(McpError::invalid_params(
                 format!("{}: no such just recipe", input.recipe),
                 None,
@@ -145,12 +196,12 @@ mod tests {
         let stdout = b"check test lint\n";
         let recipes = parse_recipe_list(stdout);
         assert_eq!(
-            recipes,
-            HashSet::from([
+            recipes.into_keys().collect::<Vec<_>>(),
+            vec![
                 RecipeName("check".to_owned()),
-                RecipeName("test".to_owned()),
                 RecipeName("lint".to_owned()),
-            ])
+                RecipeName("test".to_owned()),
+            ]
         );
     }
 
@@ -158,12 +209,45 @@ mod tests {
     fn ignores_blank_and_unindented_lines() {
         let stdout = b"check\n";
         let recipes = parse_recipe_list(stdout);
-        assert_eq!(recipes, HashSet::from([RecipeName("check".to_owned())]));
+        assert_eq!(
+            recipes.into_keys().collect::<Vec<_>>(),
+            vec![RecipeName("check".to_owned())]
+        );
     }
 
     #[test]
     fn discover_returns_empty_set_without_justfile() {
         let root = assert_fs::TempDir::new().unwrap();
         assert!(RecipeName::discover(root.path()).is_empty());
+    }
+
+    #[test]
+    fn parses_description_after_hash() {
+        let stdout = b"Available recipes:\n    check   # Run cargo check\n";
+        let descriptions = parse_recipe_descriptions(stdout);
+        assert_eq!(
+            descriptions.get(&RecipeName("check".to_owned())),
+            Some(&RecipeDescription("Run cargo check".to_owned()))
+        );
+    }
+
+    #[test]
+    fn recipe_without_hash_has_empty_description() {
+        let stdout = b"Available recipes:\n    lint\n";
+        let descriptions = parse_recipe_descriptions(stdout);
+        assert_eq!(
+            descriptions.get(&RecipeName("lint".to_owned())),
+            Some(&RecipeDescription::default())
+        );
+    }
+
+    #[test]
+    fn strips_parameters_from_recipe_name_before_hash() {
+        let stdout = b"    test *ARGS   # Run tests\n";
+        let descriptions = parse_recipe_descriptions(stdout);
+        assert_eq!(
+            descriptions.get(&RecipeName("test".to_owned())),
+            Some(&RecipeDescription("Run tests".to_owned()))
+        );
     }
 }

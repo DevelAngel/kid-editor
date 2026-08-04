@@ -64,13 +64,13 @@ impl McpService {
 mod tests {
     use super::*;
     use assert_fs::TempDir;
-    use std::collections::HashSet;
+    use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
     fn str_replace_requires_unique_match() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
+        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
         fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
         let result = svc.str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),
@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn str_replace_replaces_unique_match() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], HashSet::new());
+        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
         fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
         svc.str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),

@@ -73,14 +73,10 @@ impl McpServer {
         match just_recipes.len() {
             0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
             n => {
-                tracing::warn!(
-                    "just_run tool enabled and discovered {n} recipes: {receipes}",
-                    receipes = just_recipes
-                        .iter()
-                        .map(|name| name.to_string())
-                        .reduce(|s, name| format!("{s} | {name}"))
-                        .unwrap()
-                );
+                tracing::warn!("just_run tool enabled and discovered {n} recipes");
+                just_recipes.iter().for_each(|(name, desc)| {
+                    tracing::info!("just recipe '{name}': {desc}");
+                });
             }
         }
 

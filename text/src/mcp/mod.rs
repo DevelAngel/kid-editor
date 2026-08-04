@@ -10,7 +10,7 @@ mod tree;
 mod view;
 mod workspace_path;
 
-pub(crate) use just_run::RecipeName;
+pub(crate) use just_run::{RecipeDescription, RecipeName};
 
 use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -23,7 +23,7 @@ use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
 
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 /// MCP server exposing a text-editor tool, sandboxed to one workspace root.
@@ -34,9 +34,10 @@ pub struct McpService {
     /// not just hidden from `tree`, but unreadable, unwritable, and invisible
     /// everywhere a path is resolved.
     ignore: Vec<String>,
-    /// Recipes discovered once at construction time. Empty if the
-    /// workspace has no `justfile`.
-    just_recipes: HashSet<RecipeName>,
+    /// Recipes discovered once at construction time, with their `just
+    /// --list` doc comment (empty if none). Empty map if the workspace
+    /// has no `justfile`.
+    just_recipes: BTreeMap<RecipeName, RecipeDescription>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -71,13 +72,15 @@ impl ServerHandler for McpService {
         let mut tools = self.tool_router.list_all();
         if let Some(just_run) = tools.iter_mut().find(|tool| tool.name == "just_run") {
             let base = just_run.description.as_deref().unwrap_or_default();
-            let mut recipe_names: Vec<String> = self
+            let recipes = self
                 .just_recipes
                 .iter()
-                .map(RecipeName::to_string)
-                .collect();
-            recipe_names.sort_unstable();
-            let recipes = recipe_names.join(", ");
+                .map(|(name, description)| match description.as_str() {
+                    "" => name.to_string(),
+                    description => format!("{name} ({description})"),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             just_run.description =
                 Some(Cow::Owned(format!("{base} Available recipes: {recipes}.")));
         }
@@ -102,7 +105,7 @@ impl McpService {
     pub fn new(
         workspace_root: PathBuf,
         ignore: Vec<String>,
-        just_recipes: HashSet<RecipeName>,
+        just_recipes: BTreeMap<RecipeName, RecipeDescription>,
     ) -> Self {
         let mut tool_router = Self::create_tool_router()
             + Self::insert_tool_router()
