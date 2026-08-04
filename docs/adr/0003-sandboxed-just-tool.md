@@ -154,3 +154,34 @@ This decision leans on the same central path-checking mechanism ADR
 0001 introduced and the same ignore-list reasoning from ADR 0002: the
 `justfile` exception is enforced at that one shared gate, not
 re-implemented separately for this tool.
+
+### Addendum: a boundary the agent can't see isn't fully useful
+
+The sandboxing above answers "can the agent misuse `just_run`" but not
+"does the agent know `just_run` is worth using at all." A tool's
+description is what an MCP client shows the agent before any call is
+made, and that description is normally a string fixed at compile time —
+it has to be, since it's attached to the tool's definition, not to a
+particular server instance. But which recipes exist is only known once,
+at startup, from that specific workspace's `justfile`. A compile-time
+description can say "runs a `just` recipe" in the abstract; it cannot
+say "runs `check`, `lint`, or `test`" for a `justfile` that didn't exist
+when the server was built.
+
+In practice this meant the tool went unused even when it was exactly
+what the moment called for — an agent asked to run the project's linter
+had no way to learn, short of guessing a recipe name and being told
+"no such recipe," that `just_run` was the way to do it at all. The
+sandbox held; the tool just sat unread.
+
+The fix doesn't touch the sandbox — the discovered recipe set from
+`RecipeName::discover` was always the source of truth for what's
+callable, checked at call time regardless of what the description says.
+It only changes what the client is told *before* calling anything: the
+server builds its tool list itself rather than handing back a fixed one
+per tool definition, and for `just_run` specifically, appends the
+discovered recipe names to the description at that point — the same
+list `just_run` already validates every call against, just surfaced a
+step earlier. An agent can now see "runs `check`, `lint`, `test`" up
+front, without a failed guess first. Nothing about which recipes are
+*runnable* changes; only how early the agent learns what they are.
