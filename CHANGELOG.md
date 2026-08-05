@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
-## [0.3.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.2.0..v0.3.0) - 2026-08-04
+## [0.3.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.2.0..v0.3.0) - 2026-08-05
 
 ### Documentation
 
@@ -16,8 +16,9 @@ All notable changes to this project will be documented in this file. See [conven
 - refuse to write justfile (BufWriter) - ([39e70bc](https://github.com/DevelAngel/matrix-mcp/commit/39e70bceb6333b9f4a4b8c8fda11c1cff5f21c76)) - Angelos Drossos
 - inject just recipes into tool desc - ([bff994b](https://github.com/DevelAngel/matrix-mcp/commit/bff994b9ccdda807125c10d29281e66a36ce1a3f)) - Angelos Drossos
 - inject just recipes incl. description - ([5345db5](https://github.com/DevelAngel/matrix-mcp/commit/5345db5343f4d76d0fef8083019e367c58c4ded7)) - Angelos Drossos
-- add justfile to ignore list - ([9152765](https://github.com/DevelAngel/matrix-mcp/commit/9152765371040842cb3e78d6b2f0fbe3b464cc8d)) - Angelos Drossos
-- add extra-ignore CLI option - ([7be83e2](https://github.com/DevelAngel/matrix-mcp/commit/7be83e2b7e30c24acc75d05749193bc6bcec3b49)) - Angelos Drossos
+- add extra-ignore CLI option - ([bb33e52](https://github.com/DevelAngel/matrix-mcp/commit/bb33e52d0da998d2f311029630155bd40ef3e922)) - Angelos Drossos
+- use glob pattern for ignore lists - ([5f2b118](https://github.com/DevelAngel/matrix-mcp/commit/5f2b118522a85d8e1abcdbd95fdbadf343b134c9)) - Angelos Drossos
+- introduce enable-just-run CLI option - ([e4c82c9](https://github.com/DevelAngel/matrix-mcp/commit/e4c82c9e352ca5967493f21702f9aa45d3bee20e)) - Angelos Drossos
 
 ## [0.2.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.1.0..v0.2.0) - 2026-08-03
 
