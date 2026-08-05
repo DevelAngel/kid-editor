@@ -1,20 +1,7 @@
-//! The one law of this server: **no tool may touch a path outside the
-//! workspace root, or a path under an ignored name.** This module is the
-//! only place that law is implemented; every other module receives a
-//! [`WorkspacePath`] and never a raw string or self-built `PathBuf`.
-//!
-//! - [`UnresolvedPath`] is client input, unchecked. The only thing you can
-//!   do with one is call [`UnresolvedPath::resolve`].
-//! - [`WorkspacePath`] is the proof that check passed — no `From`, no
-//!   public field, no way to construct one that skipped it.
-//! - [`WriteBuffer`] additionally proves the path isn't a justfile-like
-//!   file (ADR 0003). Only [`WorkspacePath::into_write_buffer`] produces
-//!   one, and it hands out no raw path — a tool that never converts to a
-//!   `WriteBuffer` has no way to write anything at all.
-//!
-//! Don't deconstruct a `WorkspacePath`/`WriteBuffer` into its parts — a
-//! loose `PathBuf` carries none of this proof. Use its accessors or
-//! `Display` at the point of use instead.
+//! No tool may touch a path outside the workspace root, or under an
+//! ignored name. [`UnresolvedPath`] is unchecked client input;
+//! [`WorkspacePath`] is proof the check passed; [`WriteBuffer`]
+//! additionally proves the path isn't justfile-like (ADR 0003).
 
 use glob::{Pattern, PatternError};
 use rmcp::model::ErrorData as McpError;
@@ -29,25 +16,16 @@ use std::str::FromStr;
 
 /// A single `--ignore`/`--extra-ignore` entry: a glob pattern, optionally
 /// anchored to the workspace's top level with a leading `/`.
-///
-/// Parsing (via [`FromStr`], used by clap's derive) is the only way to
-/// build one — an invalid glob is therefore rejected at CLI-parse time,
-/// not silently swallowed the first time a path happens to be checked
-/// against it.
 #[derive(Clone, Debug)]
 pub struct IgnorePattern {
     /// `true` if the pattern had a leading `/`: matched only against a
-    /// path's first component. `false`: matched against every component,
-    /// at any depth.
+    /// path's first component.
     anchored: bool,
     glob: Pattern,
 }
 
 impl IgnorePattern {
-    /// The two conventional `just` recipe-file forms, unanchored (any
-    /// depth) — see ADR 0003 for why `import`/`import?` means these must
-    /// be caught wherever they occur, not just at the workspace root.
-    /// Infallible: both are fixed, valid glob literals, never user input.
+    /// The two conventional `just` recipe-file forms, unanchored (see ADR 0003).
     pub(crate) fn justfile_patterns() -> [Self; 2] {
         [
             Self {
@@ -61,13 +39,8 @@ impl IgnorePattern {
         ]
     }
 
-    /// Checks a single directory entry's name against this pattern, for
-    /// callers like `tree` that see one path component per entry rather
-    /// than a full relative path. `depth` is how many directories deep
-    /// `name` sits below the workspace root (0 = a direct child of the
-    /// root) — an anchored pattern only ever matches at depth 0, same as
-    /// [`IgnorePattern::matches`] only checking a `WorkspacePath`'s first
-    /// component.
+    /// Checks a single directory entry's name at `depth` (0 = direct
+    /// child of the root); an anchored pattern only matches at depth 0.
     pub(crate) fn matches_name_at_depth(&self, name: &str, depth: usize) -> bool {
         if self.anchored && depth != 0 {
             return false;
@@ -109,12 +82,8 @@ impl FromStr for IgnorePattern {
     }
 }
 
-/// A path exactly as a tool received it over the wire: unchecked, and
-/// deliberately inert. [`resolve`](UnresolvedPath::resolve) is the only
-/// door out, and it's a fallible one.
-///
-/// The inner field is `pub(crate)` only so tests in sibling modules can
-/// build fixtures directly; production code always gets one via `serde`.
+/// A path exactly as a tool received it over the wire: unchecked.
+/// [`resolve`](UnresolvedPath::resolve) is the only way to validate it.
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct UnresolvedPath(PathBuf); // AI: Never make the PathBuf pub!
@@ -125,8 +94,7 @@ impl UnresolvedPath {
         Self(unresolved.into())
     }
 
-    /// Checks this path against `workspace_root` and `ignore`. See
-    /// [`WorkspacePath::new`] for what "passes" means.
+    /// Checks this path against `workspace_root` and `ignore`.
     pub fn resolve(
         self,
         workspace_root: &Path,
