@@ -46,7 +46,7 @@ impl McpService {
         if content.ends_with('\n') {
             updated.push('\n');
         }
-        let write = path.into_write_buffer()?;
+        let write = path.into_write_buffer(self.protect_justfiles)?;
         write
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))

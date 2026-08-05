@@ -15,9 +15,11 @@ use tower_http::trace::TraceLayer;
 use type_state_builder::TypeStateBuilder;
 use url::Url;
 
+use std::collections::BTreeMap;
+use std::fs;
 use std::iter;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[derive(TypeStateBuilder, Debug)]
@@ -30,6 +32,7 @@ pub struct McpServer {
     base_url: Url,
     allowed_origins: Vec<Url>,
     ignore: Vec<IgnorePattern>,
+    enable_just_run: bool,
 }
 
 impl McpServer {
@@ -42,9 +45,6 @@ impl McpServer {
                 .map(|p| p.to_string())
                 .reduce(|s, name| format!("{s} | {name}"))
                 .unwrap_or("none".to_owned())
-        );
-        tracing::warn!(
-            "Write-protected (readable, but no tool may create/insert/replace it): justfile"
         );
 
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
@@ -69,16 +69,40 @@ impl McpServer {
         let workspace_root = self.workspace_root.canonicalize()?;
         let ignore = self.ignore;
 
-        let just_recipes = RecipeName::discover(&workspace_root);
-        match just_recipes.len() {
-            0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
-            n => {
-                tracing::warn!("just_run tool enabled and discovered {n} recipes");
-                just_recipes.iter().for_each(|(name, desc)| {
-                    tracing::info!("just recipe '{name}': {desc}");
-                });
+        let just_recipes = if self.enable_just_run {
+            let just_recipes = RecipeName::discover(&workspace_root);
+            let justfiles = find_justfiles(&workspace_root, &ignore);
+            match just_recipes.len() {
+                0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
+                n => {
+                    tracing::warn!("just_run tool enabled and discovered {n} recipes");
+                    just_recipes.iter().for_each(|(name, desc)| {
+                        tracing::info!("just recipe '{name}': {desc}");
+                    });
+                }
             }
-        }
+            // Listed regardless of whether any recipes were found: an
+            // empty justfile, or a `*.just` nobody imports, still becomes
+            // invisible and read-only the moment --enable-just-run is
+            // set (see ADR 0003) — worth surfacing even then, so the
+            // person who set the flag can check it against what they
+            // actually reviewed.
+            tracing::warn!(
+                "justfile/*.just hidden and write-protected (see ADR 0003): {}",
+                justfiles
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .reduce(|s, p| format!("{s} | {p}"))
+                    .unwrap_or("none found".to_owned())
+            );
+            just_recipes
+        } else {
+            tracing::warn!(
+                "just_run tool disabled (pass --enable-just-run to enable it); \
+                 justfile/*.just are ordinary, writable files through this server"
+            );
+            BTreeMap::new()
+        };
 
         let mcp_service = StreamableHttpService::new(
             move || {
@@ -170,4 +194,55 @@ fn host_from_url(url: &Url) -> Option<String> {
         Some(port) => format!("{host}:{port}"),
         None => host.to_owned(),
     })
+}
+
+/// Walks `root` breadth-first, collecting every `justfile`/`*.just` found
+/// — purely for the startup log in [`McpServer::serve`], so the person
+/// who set `--enable-just-run` can cross-check what's about to become
+/// hidden and read-only against what they actually reviewed, rather than
+/// trusting that the two match.
+///
+/// Directories matching `ignore` (the plain `--ignore`/`--extra-ignore`
+/// list, *not* yet including the justfile patterns — those are added by
+/// [`McpService::new`], after this runs) are skipped, mainly so this
+/// doesn't wander into `node_modules` or `target` for no reason. This
+/// walk has no bearing on which files actually end up protected — that's
+/// decided per-request by `WorkspacePath`/`IgnorePattern`, independent of
+/// this function entirely — so a directory this skips is a directory
+/// this log stays quiet about, not a directory the server stops
+/// protecting.
+fn find_justfiles(root: &Path, ignore: &[IgnorePattern]) -> Vec<PathBuf> {
+    let justfile_patterns = IgnorePattern::justfile_patterns();
+    let mut found = Vec::new();
+    let mut queue = std::collections::VecDeque::from([(root.to_path_buf(), 0usize)]);
+    while let Some((dir, depth)) = queue.pop_front() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.filter_map(Result::ok) {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if ignore
+                .iter()
+                .any(|pattern| pattern.matches_name_at_depth(&name, depth))
+            {
+                continue;
+            }
+            let path = entry.path();
+            if path.is_dir() {
+                queue.push_back((path, depth + 1));
+            } else if justfile_patterns
+                .iter()
+                .any(|pattern| pattern.matches_name_at_depth(&name, depth))
+            {
+                found.push(
+                    path.strip_prefix(root)
+                        .map(Path::to_path_buf)
+                        .unwrap_or(path),
+                );
+            }
+        }
+    }
+    found.sort();
+    found
 }

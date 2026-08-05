@@ -35,7 +35,20 @@ pub struct McpService {
     /// "target", or "*.log" — not just hidden from `tree`, but unreadable,
     /// unwritable, and invisible everywhere a path is resolved. See
     /// [`IgnorePattern`] for the matching rules.
+    ///
+    /// When [`protect_justfiles`](Self::protect_justfiles) is set, this
+    /// also includes [`IgnorePattern::justfile_patterns`] — added here in
+    /// [`McpService::new`], not via `--ignore`, so justfile protection
+    /// stays tied to whether `just_run` is actually offered rather than
+    /// to ordinary, user-editable ignore configuration.
     ignore: Vec<IgnorePattern>,
+    /// Whether `justfile`/`*.just` are write-refused (`into_write_buffer`)
+    /// in addition to being folded into `ignore` above. `true` unless
+    /// `just_run` has no recipes to run — see `--enable-just-run` and
+    /// ADR 0003: the protection exists only to stop an agent from editing
+    /// a recipe it could then run, so it has no purpose once running one
+    /// is impossible.
+    protect_justfiles: bool,
     /// Recipes discovered once at construction time, with their `just
     /// --list` doc comment (empty if none). Empty map if the workspace
     /// has no `justfile`.
@@ -94,6 +107,12 @@ impl ServerHandler for McpService {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
+        if request.name == "just_run" && !self.protect_justfiles {
+            return Err(McpError::invalid_params(
+                "just_run is disabled. If it previously appeared in your tool list, that list is now stale.",
+                None,
+            ));
+        }
         self.tool_router
             .call(ToolCallContext::new(self, request, context))
             .await
@@ -103,10 +122,13 @@ impl ServerHandler for McpService {
 impl McpService {
     /// `just_recipes` is discovered once by the caller (see
     /// `McpServer::serve`), not per session — re-running `just --summary`
-    /// on every new connection would be wasted work.
+    /// on every new connection would be wasted work. Pass an empty map to
+    /// leave `just_run` disabled (the default, absent `--enable-just-run`),
+    /// which also leaves `justfile`/`*.just` unprotected — see
+    /// [`protect_justfiles`](Self::protect_justfiles).
     pub fn new(
         workspace_root: PathBuf,
-        ignore: Vec<IgnorePattern>,
+        mut ignore: Vec<IgnorePattern>,
         just_recipes: BTreeMap<RecipeName, RecipeDescription>,
     ) -> Self {
         let mut tool_router = Self::create_tool_router()
@@ -114,13 +136,16 @@ impl McpService {
             + Self::str_replace_tool_router()
             + Self::tree_tool_router()
             + Self::view_tool_router();
-        if !just_recipes.is_empty() {
+        let protect_justfiles = !just_recipes.is_empty();
+        if protect_justfiles {
             tool_router += Self::just_run_tool_router();
+            ignore.extend(IgnorePattern::justfile_patterns());
         }
 
         Self {
             workspace_root,
             ignore,
+            protect_justfiles,
             just_recipes,
             tool_router,
         }

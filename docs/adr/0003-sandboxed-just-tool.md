@@ -104,6 +104,34 @@ confirming that neither the justfile path nor the working directory can
 be influenced by anything in its input, and that only recipe names
 already present in the discovered list are ever accepted.
 
+### Addendum: reading was closed too
+
+The "Reading stays open" reasoning above held only as long as a read
+couldn't, by itself, hand anything back out — true for a human, not
+guaranteed for an agent whose next step might be summarizing file
+contents into a context an attacker-controlled prompt can steer. The
+default `--ignore` list was extended to cover `justfile` itself as well,
+making it invisible to `view` and `tree`, not merely write-refused.
+`just_run`'s tool description (see the addendum below) remains the
+agent's only window into what recipes exist, by design — that was
+always meant to be sufficient, and closing the read path is what makes
+it actually the *only* one, rather than one of two.
+
+This is a default, not a hard rule the way write-refusal is: unlike
+`into_write_buffer`, the ignore list is ordinary server configuration,
+so an operator can still choose to make justfile-like files readable
+again by passing a narrower `--ignore`. The write-refusal in
+`into_write_buffer` stays unconditional either way, so removing the
+default ignore entry only restores *reading*, never editing — see
+"More Information" below for why the two checks are kept independent.
+
+*(Superseded in part by the "conditional on `just_run` existing at all"
+addendum further below: both checks moved out of `--ignore`'s default
+value, and write-refusal stopped being unconditional, once `just_run`
+itself became opt-in via `--enable-just-run`. This addendum is kept for
+the reasoning that motivated closing the read path in the first place,
+which still holds.)
+
 ## Pros and Cons of the Options
 
 ### Trust the agent not to add anything harmful to the `justfile`
@@ -185,3 +213,76 @@ list `just_run` already validates every call against, just surfaced a
 step earlier. An agent can now see "runs `check`, `lint`, `test`" up
 front, without a failed guess first. Nothing about which recipes are
 *runnable* changes; only how early the agent learns what they are.
+
+### Addendum: `import` reopens the file half of the problem
+
+The original decision treated "the `justfile`" as one file, protected by
+name. But `just` supports `import 'path'` and `import? 'path'` (and
+`mod name` for submodules) directly inside a `justfile`, pulling recipes
+in from another file at parse time — a file the agent, without a further
+rule, could read and write freely, since only the literal name
+`justfile` was ever refused. Editing that imported file is exactly as
+effective a way to add or change a recipe as editing the `justfile`
+itself would have been; the protected name became a facade with an
+unprotected side door right next to it.
+
+The fix widens the same two refusals ADR 0003 already established —
+ignored (invisible) and write-refused — from the single literal name
+`justfile` to two conventional patterns, matched at every depth rather
+than just the workspace root: `justfile` and `*.just`. A file named
+`recipes/build.just` is now exactly as untouchable as the top-level
+`justfile` always was, for the same reason.
+
+This is a deliberate narrowing, not full closure: `just`'s import target
+is an arbitrary string, and a `justfile` can `import 'notes.md'` or
+`import 'build-steps'` just as validly as `import 'ci.just'`. Actually
+parsing every `justfile` for its import targets and protecting whatever
+they resolve to would close that gap completely, but at the cost of a
+recursive parser sitting in the trust path — more surface, for a
+convention almost every real project already follows. The two patterns
+here catch the conventional case; a `justfile` that imports something
+named unconventionally is a risk this server does not currently guard
+against, and that gap is intentional enough to be worth stating
+plainly rather than leaving implicit.
+
+### Addendum: the protection is conditional on `just_run` existing at all
+
+`just_run` is off by default and only turns on via `--enable-just-run` —
+requiring an explicit, positive choice rather than inferring it from a
+`justfile`'s mere presence, because a `justfile` an operator hasn't
+looked at is exactly the trust this ADR was written to avoid extending
+automatically. Once that flag is set, the entire justification for
+treating `justfile`/`*.just` specially applies: every refusal above,
+from the original 2026-08-03 decision through both addenda, exists to
+stop an agent from editing a recipe it could then invoke. Without the
+flag, `just_run` is never offered at all — an agent that cannot invoke
+*any* recipe has nothing to gain from editing one either, so the files
+are just text at that point, no more dangerous than any other file in
+the workspace.
+
+So the two checks were made conditional on the same signal that already
+decides whether `just_run` is offered — `!just_recipes.is_empty()`,
+itself always `false` unless `--enable-just-run` was passed, since
+recipe discovery doesn't run at all without it. `justfile`/`*.just` are
+folded into the effective ignore list (and `into_write_buffer`'s refusal
+enabled) only when that's `true`; by default, they're ordinary files —
+readable, writable, listed in `tree` — same as anything else not
+matched by `--ignore`. This also moved the two patterns out of
+`--ignore`'s own default value: they were never meant to be ordinary,
+user-editable ignore configuration, and living in the same list as
+`.git`/`target`/etc. made that unclear.
+
+`--enable-just-run` is meant to be the operator's confirmation that
+they've reviewed the workspace's `justfile` — but a flag can't verify
+that a review actually happened, only that someone typed it. To make
+that confirmation checkable rather than merely assumed, startup walks
+the workspace (skipping whatever `--ignore` already skips) and logs
+every `justfile`/`*.just` it finds, by path, before the server starts
+accepting connections. Anyone who set the flag can read that list back
+against what they remember reviewing; anyone who didn't review carefully
+gets a second, concrete chance to notice a file they missed, in a
+directory they didn't expect a recipe file to be. The walk plays no part
+in what actually gets protected — that's still `IgnorePattern`/
+`WorkspacePath`, evaluated per request — it exists purely so the
+assumption behind `--enable-just-run` has somewhere to be checked
+instead of just made.

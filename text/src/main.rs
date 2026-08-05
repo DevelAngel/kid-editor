@@ -35,6 +35,7 @@ async fn main() -> Result<()> {
         .allowed_origins(cli.allowed_origins)
         .workspace_root(cli.workspace_root)
         .ignore(cli.ignore.into_iter().chain(cli.extra_ignore).collect())
+        .enable_just_run(cli.enable_just_run)
         .clients(clients)
         .build()
         .serve(cli.addr)

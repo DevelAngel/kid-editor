@@ -37,8 +37,11 @@ pub struct Cli {
     /// nonexistent, not just hidden from `tree`, e.g. ".git", "target", or
     /// "*.log". Matched against every path component at any depth unless
     /// prefixed with "/", which anchors the pattern to the workspace's
-    /// top level only (e.g. "/justfile" hides just the top-level file,
-    /// not "sub/justfile"). Can be repeated or comma-separated.
+    /// top level only (e.g. "/README.md" hides just the top-level file,
+    /// not "sub/README.md"). Can be repeated or comma-separated.
+    ///
+    /// `justfile` and `*.just` are handled separately, not through this
+    /// list — see `--enable-just-run` and ADR 0003.
     #[clap(
         long,
         value_name = "PATTERN",
@@ -46,7 +49,7 @@ pub struct Cli {
         value_hint = ValueHint::AnyPath,
         default_value = ".git,.hg,.svn,.jj,target,node_modules,.venv,venv,\
                           __pycache__,.mypy_cache,.pytest_cache,.ruff_cache,\
-                          dist,build,.next,.idea,.vscode,.DS_Store,/justfile"
+                          dist,build,.next,.idea,.vscode,.DS_Store"
     )]
     pub ignore: Vec<IgnorePattern>,
 
@@ -56,6 +59,19 @@ pub struct Cli {
     /// Can be repeated or comma-separated.
     #[clap(long = "extra-ignore", value_name = "PATTERN", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
     pub extra_ignore: Vec<IgnorePattern>,
+
+    /// Enable the `just_run` tool. Off by default: a `justfile` in the
+    /// workspace is not enough on its own, since discovering recipes
+    /// automatically would mean trusting whatever recipes happen to be
+    /// there without a human ever having looked. Passing this flag is
+    /// that look — it means someone reviewed the workspace's `justfile`
+    /// and decided its recipes are fine to expose. Once set, recipe
+    /// discovery runs and the `just_run` tool is offered if any recipes
+    /// were found; `justfile`/`*.just` also become invisible and
+    /// read-only through this server, everywhere in the workspace, at
+    /// the same time — see ADR 0003.
+    #[clap(long)]
+    pub enable_just_run: bool,
 
     #[command(flatten)]
     pub oauth: OauthOptions,

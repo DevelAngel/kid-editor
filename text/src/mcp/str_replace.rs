@@ -49,7 +49,7 @@ impl McpService {
         }
 
         let updated = content.replacen(&input.old_str, &input.new_str, 1);
-        let write = path.into_write_buffer()?;
+        let write = path.into_write_buffer(self.protect_justfiles)?;
         write
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
