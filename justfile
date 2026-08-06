@@ -16,12 +16,12 @@ lint:
 
 # --- test ---
 
-# Run all tests (unit tests + Cucumber-BDD integration tests)
+# Run all tests
 [group('test')]
 test:
     cargo test
 
-# Run a single unit test by name
+# Run a single test by name
 [group('test')]
 test-one name:
     cargo test -- {{name}}
@@ -40,6 +40,7 @@ debug-native:
 release-native:
     cargo build --release --locked
 
+# Build a release for a specific arch and libc
 [group('build-release')]
 release-cross:
     cross build --target {{arch}}-unknown-linux-{{libc}} --release --locked
