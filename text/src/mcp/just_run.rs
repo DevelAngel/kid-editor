@@ -153,6 +153,8 @@ impl McpService {
             .arg(self.workspace_root.join("justfile"))
             .arg("--working-directory")
             .arg(&self.workspace_root)
+            .arg("--one")
+            .arg("--") //< prevents that MCP client injects just options
             .arg(input.recipe.as_str())
             .output()
             .map_err(|e| McpError::internal_error(format!("failed to run `just`: {e}"), None))?;
