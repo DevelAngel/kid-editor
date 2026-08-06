@@ -41,6 +41,7 @@ release-native:
     cargo build --release --locked
 
 # Build a release for a specific arch and libc
+[private]
 [group('build-release')]
 release-cross:
     cross build --target {{arch}}-unknown-linux-{{libc}} --release --locked
