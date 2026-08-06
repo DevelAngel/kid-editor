@@ -157,6 +157,7 @@ impl McpService {
             .arg("--working-directory")
             .arg(&self.workspace_root)
             .arg("--one")
+            .arg("--yes")
             .arg("--") //< prevents that MCP client injects just options
             .arg(input.recipe.as_str())
             .args(input.args.unwrap_or_default().iter())
