@@ -132,6 +132,9 @@ fn parse_recipe_descriptions(stdout: &[u8]) -> BTreeMap<RecipeName, RecipeDescri
 struct JustRunInput {
     /// Name of a `just` recipe to run.
     recipe: RecipeName,
+    /// Optional arguments if the recipe has some.
+    #[serde(default)]
+    args: Option<Vec<String>>,
 }
 
 #[tool_router(router = just_run_tool_router, vis = "pub(super)")]
@@ -156,6 +159,7 @@ impl McpService {
             .arg("--one")
             .arg("--") //< prevents that MCP client injects just options
             .arg(input.recipe.as_str())
+            .args(input.args.unwrap_or_default().iter())
             .output()
             .map_err(|e| McpError::internal_error(format!("failed to run `just`: {e}"), None))?;
 
