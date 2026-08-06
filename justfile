@@ -4,7 +4,7 @@ libc := "musl"
 
 # --- linting ---
 
-# Full workspace build check (catches cross-crate issues)
+# Full workspace build check • catches cross-crate issues
 [group('lint')]
 check:
     cargo check --all-targets

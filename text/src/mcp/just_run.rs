@@ -9,6 +9,7 @@ use super::McpService;
 
 use anyhow::Result;
 use derive_more::{Deref, Display};
+use indexmap::IndexMap;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError};
 use rmcp::schemars::{self, JsonSchema};
@@ -33,11 +34,53 @@ const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 #[serde(transparent)]
 pub struct RecipeName(String);
 
+/// Everything discovered about one recipe: its doc comment plus its
+/// parameters, if any. A recipe with no parameters has empty `args`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RecipeInfo {
+    description: RecipeDescription,
+    args: RecipeArgs,
+}
+
+impl RecipeInfo {
+    pub fn has_desc(&self) -> bool {
+        !self.description.is_empty()
+    }
+    pub fn desc(&self) -> &str {
+        &self.description
+    }
+    pub fn has_args(&self) -> bool {
+        !self.args.is_empty()
+    }
+    pub fn arg_names(&self) -> impl Iterator<Item = &ArgName> {
+        self.args.keys()
+    }
+    pub fn args(&self) -> impl Iterator<Item = (&ArgName, &ArgHelp)> {
+        self.args.iter()
+    }
+}
+
 /// The doc comment `just --show <recipe>` printed above a recipe's
 /// signature, if any. Empty when the recipe has none — still listed,
 /// just undescribed.
 #[derive(Clone, Debug, Default, Deref, Display, Eq, PartialEq)]
 pub struct RecipeDescription(String);
+
+/// A recipe's parameters in signature order, name to help text.
+pub type RecipeArgs = IndexMap<ArgName, ArgHelp>;
+
+/// A recipe parameter as `just --usage <recipe>` names it under
+/// `Arguments:` (e.g. `message`, `[args...]`). Order matters — positional
+/// arguments must be reported in signature order — hence [`RecipeArgs`]
+/// being an [`IndexMap`] rather than a [`BTreeMap`], which would
+/// alphabetize them.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deref, Display)]
+pub struct ArgName(String);
+
+/// The `[arg(..., help = "...")]` text for one parameter, if any.
+/// Empty when the parameter has none.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Deref, Display)]
+pub struct ArgHelp(String);
 
 impl RecipeName {
     /// Empty map if there is no `justfile`, or if `just` isn't available —
@@ -45,11 +88,11 @@ impl RecipeName {
     /// offering no tool at all.
     ///
     /// `--summary` is the source of truth for which recipes exist. Each
-    /// name is then described individually via `--show`, which prints the
-    /// recipe's own source (comment + signature + body) rather than a
-    /// generated table row — more calls, but immune to `--list`'s
-    /// column-position-dependent format.
-    pub fn discover(workspace_root: &Path) -> BTreeMap<Self, RecipeDescription> {
+    /// name is then described individually via `--show` (recipe's own
+    /// source, immune to `--list`'s column-position-dependent format) and
+    /// `--usage` (per-parameter help) — two extra calls per recipe, but
+    /// negligible for a local `just` invocation.
+    pub fn discover(workspace_root: &Path) -> BTreeMap<Self, RecipeInfo> {
         let justfile_path = workspace_root.join("justfile");
         if !justfile_path.is_file() {
             return BTreeMap::new();
@@ -68,7 +111,10 @@ impl RecipeName {
                 let description = run_just(&justfile_path, &["--show", name.as_str()])
                     .map(|stdout| parse_recipe_description(&stdout))
                     .unwrap_or_default();
-                (name, description)
+                let args = run_just(&justfile_path, &["--usage", name.as_str()])
+                    .map(|stdout| parse_recipe_usage(&stdout))
+                    .unwrap_or_default();
+                (name, RecipeInfo { description, args })
             })
             .collect()
     }
@@ -121,6 +167,26 @@ fn parse_recipe_description(stdout: &[u8]) -> RecipeDescription {
         .and_then(|line| line.strip_prefix('#'))
         .map(|desc| RecipeDescription(desc.trim().to_owned()))
         .unwrap_or_default()
+}
+
+/// `just --usage <recipe>` prints a `Usage: ...` line, then — only if
+/// the recipe takes parameters — a blank line, `Arguments:`, and one
+/// indented `<name> <help>` line per parameter (help empty if the
+/// parameter has none). Recipes without parameters have no `Arguments:`
+/// section at all, so this returns an empty map for them.
+fn parse_recipe_usage(stdout: &[u8]) -> RecipeArgs {
+    let text = String::from_utf8_lossy(stdout);
+    text.lines()
+        .skip_while(|line| line.trim() != "Arguments:")
+        .skip(1)
+        .take_while(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut name_and_help = line.trim().splitn(2, char::is_whitespace);
+            let name = name_and_help.next().unwrap_or_default().to_owned();
+            let help = name_and_help.next().unwrap_or_default().trim().to_owned();
+            (ArgName(name), ArgHelp(help))
+        })
+        .collect()
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -247,6 +313,42 @@ mod tests {
         assert_eq!(
             parse_recipe_description(stdout),
             RecipeDescription("Run all tests".to_owned())
+        );
+    }
+
+    #[test]
+    fn parses_args_from_usage_output() {
+        let stdout =
+            b"Usage: just git-commit message [args...]\n\nArguments:\n  message commit message\n  [args...] more arguments\n";
+        let args = parse_recipe_usage(stdout);
+        assert_eq!(
+            args.into_iter().collect::<Vec<_>>(),
+            vec![
+                (
+                    ArgName("message".to_owned()),
+                    ArgHelp("commit message".to_owned())
+                ),
+                (
+                    ArgName("[args...]".to_owned()),
+                    ArgHelp("more arguments".to_owned())
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn recipe_without_parameters_has_no_args() {
+        let stdout = b"Usage: just check\n";
+        assert!(parse_recipe_usage(stdout).is_empty());
+    }
+
+    #[test]
+    fn arg_without_help_text_has_empty_help() {
+        let stdout = b"Usage: just git-add args\n\nArguments:\n  args\n";
+        let args = parse_recipe_usage(stdout);
+        assert_eq!(
+            args.get(&ArgName("args".to_owned())),
+            Some(&ArgHelp::default())
         );
     }
 }

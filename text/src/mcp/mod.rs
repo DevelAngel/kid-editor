@@ -10,7 +10,7 @@ mod tree;
 mod view;
 mod workspace_path;
 
-pub(crate) use just_run::{RecipeDescription, RecipeName};
+pub(crate) use just_run::{RecipeInfo, RecipeName};
 pub use workspace_path::IgnorePattern;
 
 use anyhow::Result;
@@ -49,10 +49,10 @@ pub struct McpService {
     /// a recipe it could then run, so it has no purpose once running one
     /// is impossible.
     protect_justfiles: bool,
-    /// Recipes discovered once at construction time, with their `just
-    /// --list` doc comment (empty if none). Empty map if the workspace
-    /// has no `justfile`.
-    just_recipes: BTreeMap<RecipeName, RecipeDescription>,
+    /// Recipes discovered once at construction time, with their doc
+    /// comment and parameter help (empty if none). Empty map if the
+    /// workspace has no `justfile`.
+    just_recipes: BTreeMap<RecipeName, RecipeInfo>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -90,14 +90,36 @@ impl ServerHandler for McpService {
             let recipes = self
                 .just_recipes
                 .iter()
-                .map(|(name, description)| match description.as_str() {
-                    "" => name.to_string(),
-                    description => format!("{name} ({description})"),
+                .map(|(name, info)| {
+                    let params = info
+                        .arg_names()
+                        .map(|arg| arg.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let mut line = match params.as_str() {
+                        "" => name.to_string(),
+                        params => format!("{name} {params}"),
+                    };
+                    if info.has_desc() {
+                        line.push_str(&format!(": {}", info.desc()));
+                    }
+                    if info.has_args() {
+                        let help = info
+                            .args()
+                            .map(|(arg, help)| match help.as_str() {
+                                "" => arg.to_string(),
+                                help => format!("{arg} — {help}"),
+                            })
+                            .collect::<Vec<_>>()
+                            .join("; ");
+                        line.push_str(&format!(" (args: {help})"));
+                    }
+                    format!("- {line}")
                 })
                 .collect::<Vec<_>>()
-                .join(", ");
+                .join("\n");
             just_run.description =
-                Some(Cow::Owned(format!("{base} Available recipes: {recipes}.")));
+                Some(Cow::Owned(format!("{base} Available recipes:\n{recipes}")));
         }
         Ok(ListToolsResult::with_all_items(tools))
     }
@@ -129,7 +151,7 @@ impl McpService {
     pub fn new(
         workspace_root: PathBuf,
         mut ignore: Vec<IgnorePattern>,
-        just_recipes: BTreeMap<RecipeName, RecipeDescription>,
+        just_recipes: BTreeMap<RecipeName, RecipeInfo>,
     ) -> Self {
         let mut tool_router = Self::create_tool_router()
             + Self::insert_tool_router()

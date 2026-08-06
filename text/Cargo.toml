@@ -17,6 +17,7 @@ axum.workspace = true
 clap.workspace = true
 clap-verbosity-flag.workspace = true
 glob.workspace = true
+indexmap.workspace = true
 rmcp = { workspace = true, features = [
   "auth",
   "server",

@@ -76,8 +76,8 @@ impl McpServer {
                 0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
                 n => {
                     tracing::warn!("just_run tool enabled and discovered {n} recipes");
-                    just_recipes.iter().for_each(|(name, desc)| {
-                        tracing::info!("just recipe '{name}': {desc}");
+                    just_recipes.iter().for_each(|(name, info)| {
+                        tracing::info!("just recipe '{name}': {}", info.desc());
                     });
                 }
             }

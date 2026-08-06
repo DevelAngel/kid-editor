@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.4.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.3.0..v0.4.0) - 2026-08-06
+
+### Bug Fixes
+
+- **(mcp)** allow only one just recipe call - ([a2b8a30](https://github.com/DevelAngel/matrix-mcp/commit/a2b8a30df8168ea178c0dee52a5554994a13c8e2)) - Angelos Drossos
+
+### Documentation
+
+- reduce src comments - ([39df30f](https://github.com/DevelAngel/matrix-mcp/commit/39df30f82b7b8bfa5f67c1cf7bc0eaebdf726865)) - Angelos Drossos
+
+### Features
+
+- **(mcp)** support just recipe arguments - ([8c0334a](https://github.com/DevelAngel/matrix-mcp/commit/8c0334a9a0e1e3642c8833cd53d6326a122bf34a)) - Angelos Drossos
+- **(mcp)** inject just recipe argument help - ([76fffcd](https://github.com/DevelAngel/matrix-mcp/commit/76fffcdeee06f148ac51cf1c0f6184726324c1a1)) - Angelos Drossos
+
+### Miscellaneous Chores
+
+- improve just recipe desc - ([7ff1fd2](https://github.com/DevelAngel/matrix-mcp/commit/7ff1fd29f149495c4d5d2633d703ca6bfafddde0)) - Angelos Drossos
+- hide release-cross just recipe - ([d6731bb](https://github.com/DevelAngel/matrix-mcp/commit/d6731bb57077fdd308abe69f57d47cae54444f76)) - Angelos Drossos
+- add git just recipes - ([f2bcc22](https://github.com/DevelAngel/matrix-mcp/commit/f2bcc22a5784031d4a3a2e58a55650f28cc2b5ef)) - Angelos Drossos
+
+### Refactoring
+
+- **(mcp)** use just --show for recipe descriptions - ([e7526e2](https://github.com/DevelAngel/matrix-mcp/commit/e7526e2cfd91dbfd5d65c85c76ca96cee7809b54)) - Angelos Drossos
+
 ## [0.3.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.2.0..v0.3.0) - 2026-08-05
 
 ### Documentation
