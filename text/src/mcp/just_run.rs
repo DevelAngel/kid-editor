@@ -33,8 +33,9 @@ const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 #[serde(transparent)]
 pub struct RecipeName(String);
 
-/// The doc comment `just --list` printed above a recipe, if any. Empty
-/// when the recipe has none — still listed, just undescribed.
+/// The doc comment `just --show <recipe>` printed above a recipe's
+/// signature, if any. Empty when the recipe has none — still listed,
+/// just undescribed.
 #[derive(Clone, Debug, Default, Deref, Display, Eq, PartialEq)]
 pub struct RecipeDescription(String);
 
@@ -43,10 +44,11 @@ impl RecipeName {
     /// either way, the caller ends up offering no recipes, same as
     /// offering no tool at all.
     ///
-    /// `--summary` is the source of truth for which recipes exist;
-    /// `--list` only annotates that set with descriptions, so a recipe
-    /// `--list` doesn't describe still ends up in the map, just with an
-    /// empty [`RecipeDescription`].
+    /// `--summary` is the source of truth for which recipes exist. Each
+    /// name is then described individually via `--show`, which prints the
+    /// recipe's own source (comment + signature + body) rather than a
+    /// generated table row — more calls, but immune to `--list`'s
+    /// column-position-dependent format.
     pub fn discover(workspace_root: &Path) -> BTreeMap<Self, RecipeDescription> {
         let justfile_path = workspace_root.join("justfile");
         if !justfile_path.is_file() {
@@ -60,14 +62,12 @@ impl RecipeName {
             return BTreeMap::new();
         }
 
-        let mut descriptions = run_just(&justfile_path, &["--list", "--unsorted", "--no-aliases"])
-            .map(|stdout| parse_recipe_descriptions(&stdout))
-            .unwrap_or_default();
-
         names
             .into_keys()
             .map(|name| {
-                let description = descriptions.remove(&name).unwrap_or_default();
+                let description = run_just(&justfile_path, &["--show", name.as_str()])
+                    .map(|stdout| parse_recipe_description(&stdout))
+                    .unwrap_or_default();
                 (name, description)
             })
             .collect()
@@ -109,23 +109,18 @@ fn parse_recipe_list(stdout: &[u8]) -> BTreeMap<RecipeName, ()> {
         .collect()
 }
 
-/// `just --list --unsorted --no-aliases` prints one indented line per
-/// recipe: the name (plus any parameters), then optionally `# ` followed
-/// by its doc comment. The header line ("Available recipes:") and any
-/// line without a recognizable leading name are skipped.
-fn parse_recipe_descriptions(stdout: &[u8]) -> BTreeMap<RecipeName, RecipeDescription> {
+/// `just --show <recipe>` prints the recipe's own source: an optional
+/// leading `# ` doc comment line, then optional attribute lines like
+/// `[group('name')]`, then the signature and body. The doc comment is
+/// always the first line and always starts with `#` — no column-position
+/// parsing needed. Empty if the recipe has no doc comment.
+fn parse_recipe_description(stdout: &[u8]) -> RecipeDescription {
     String::from_utf8_lossy(stdout)
         .lines()
-        .filter_map(|line| {
-            let mut name_and_rest = line.trim().splitn(2, char::is_whitespace);
-            let name = name_and_rest.next()?.to_owned();
-            let description = line
-                .split_once('#')
-                .map(|(_, desc)| desc.trim().to_owned())
-                .unwrap_or_default();
-            Some((RecipeName(name), RecipeDescription(description)))
-        })
-        .collect()
+        .next()
+        .and_then(|line| line.strip_prefix('#'))
+        .map(|desc| RecipeDescription(desc.trim().to_owned()))
+        .unwrap_or_default()
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -229,32 +224,29 @@ mod tests {
     }
 
     #[test]
-    fn parses_description_after_hash() {
-        let stdout = b"Available recipes:\n    check   # Run cargo check\n";
-        let descriptions = parse_recipe_descriptions(stdout);
+    fn parses_description_from_leading_comment_line() {
+        let stdout = b"# Run cargo check\ncheck:\n    cargo check\n";
         assert_eq!(
-            descriptions.get(&RecipeName("check".to_owned())),
-            Some(&RecipeDescription("Run cargo check".to_owned()))
+            parse_recipe_description(stdout),
+            RecipeDescription("Run cargo check".to_owned())
         );
     }
 
     #[test]
-    fn recipe_without_hash_has_empty_description() {
-        let stdout = b"Available recipes:\n    lint\n";
-        let descriptions = parse_recipe_descriptions(stdout);
+    fn recipe_without_leading_comment_has_empty_description() {
+        let stdout = b"lint:\n    cargo clippy\n";
         assert_eq!(
-            descriptions.get(&RecipeName("lint".to_owned())),
-            Some(&RecipeDescription::default())
+            parse_recipe_description(stdout),
+            RecipeDescription::default()
         );
     }
 
     #[test]
-    fn strips_parameters_from_recipe_name_before_hash() {
-        let stdout = b"    test *ARGS   # Run tests\n";
-        let descriptions = parse_recipe_descriptions(stdout);
+    fn parses_description_when_group_attribute_follows() {
+        let stdout = b"# Run all tests\n[group('test')]\ntest:\n    cargo test\n";
         assert_eq!(
-            descriptions.get(&RecipeName("test".to_owned())),
-            Some(&RecipeDescription("Run tests".to_owned()))
+            parse_recipe_description(stdout),
+            RecipeDescription("Run all tests".to_owned())
         );
     }
 }
