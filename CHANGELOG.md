@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. See [conven
 
 - **(mcp)** allow only one just recipe call - ([a2b8a30](https://github.com/DevelAngel/matrix-mcp/commit/a2b8a30df8168ea178c0dee52a5554994a13c8e2)) - Angelos Drossos
 
+### Build
+
+- **(prek)** add prepare commit msg hook - ([3d842c4](https://github.com/DevelAngel/matrix-mcp/commit/3d842c4c5a8a3f571a6c17e1e4dee1b03b21f82e)) - Angelos Drossos
+
 ### Documentation
 
 - reduce src comments - ([39df30f](https://github.com/DevelAngel/matrix-mcp/commit/39df30f82b7b8bfa5f67c1cf7bc0eaebdf726865)) - Angelos Drossos
@@ -15,7 +19,7 @@ All notable changes to this project will be documented in this file. See [conven
 ### Features
 
 - **(mcp)** support just recipe arguments - ([8c0334a](https://github.com/DevelAngel/matrix-mcp/commit/8c0334a9a0e1e3642c8833cd53d6326a122bf34a)) - Angelos Drossos
-- **(mcp)** inject just recipe argument help - ([76fffcd](https://github.com/DevelAngel/matrix-mcp/commit/76fffcdeee06f148ac51cf1c0f6184726324c1a1)) - Angelos Drossos
+- **(mcp)** inject just recipe argument help - ([7a9ea45](https://github.com/DevelAngel/matrix-mcp/commit/7a9ea4546bbae464960b2f3c8e2e23a507edb366)) - Angelos Drossos
 
 ### Miscellaneous Chores
 
