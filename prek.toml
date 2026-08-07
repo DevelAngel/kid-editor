@@ -40,9 +40,9 @@ language = "system"
 types = ["rust"]
 pass_filenames = false
 entry = "just test"
-[[repos.hooks]]
-stages = ["prepare-commit-msg"]
-id = "git-cliff"
-name = "git cliff"
-language = "system"
-entry = "scripts/prepare_commit_msg.py"
+# [[repos.hooks]]
+# stages = ["prepare-commit-msg"]
+# id = "git-cliff"
+# name = "git cliff"
+# language = "system"
+# entry = "scripts/prepare_commit_msg.py"
