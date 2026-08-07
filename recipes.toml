@@ -1,0 +1,77 @@
+# Recipes for the `recipe_run` MCP tool (enable with `--recipes-file
+# recipes.toml`) and the standalone `recipe` CLI. See ADR 0004.
+#
+# Deliberately minimal: no shell, no variadic passthrough of extra flags
+# (the `justfile` this is ported from uses `*args`/`+args` for that on
+# several git recipes) — every parameter here is a single named slot
+# substituted into exactly one `run` element. Extend a recipe's `run`
+# array directly if a specific extra flag turns out to be needed
+# regularly, rather than reopening free-form argument passthrough.
+
+[recipe.check]
+description = "Check that the whole project still compiles, including tests"
+run = ["cargo", "check", "--all-targets"]
+
+[recipe.lint]
+description = "Run the linter (Clippy) and report style/correctness issues"
+run = ["cargo", "clippy"]
+
+[recipe.test]
+description = "Run the full test suite"
+run = ["cargo", "test"]
+
+[recipe.test-one]
+description = "Run a single test by name"
+run = ["cargo", "test", "--", "{name}"]
+
+[recipe.test-one.args.name]
+help = "name of the test to run"
+
+[recipe.debug-native]
+description = "Build the project with debug symbols"
+run = ["cargo", "build"]
+
+[recipe.release-native]
+description = "Build an optimized release binary"
+run = ["cargo", "build", "--release", "--locked"]
+
+[recipe.git-status]
+description = "Show which files have uncommitted changes"
+run = ["git", "status"]
+
+[recipe.git-diff]
+description = "Show what changed, line by line, since the last commit"
+run = ["git", "diff"]
+
+[recipe.git-log]
+description = "Show recent commit history"
+run = ["git", "log", "--no-color", "--graph", "--pretty=format:%h • %s (%(decorate:prefix=,suffix= • )%cr)"]
+
+[recipe.git-add]
+description = "Stage a file's changes so the next commit includes them"
+run = ["git", "add", "{path}"]
+
+[recipe.git-add.args.path]
+help = "file or directory to stage"
+
+[recipe.git-commit]
+description = "Save all staged changes as a new commit"
+run = ["git", "commit", "--message", "{message}"]
+
+[recipe.git-commit.args.message]
+help = "commit message"
+
+[recipe.git-rebase]
+description = "Replay this branch's commits on top of another branch"
+run = ["git", "rebase", "{target}"]
+
+[recipe.git-rebase.args.target]
+help = "branch or commit to rebase onto"
+
+[recipe.git-rebase-continue]
+description = "Continue a rebase after fixing a conflict"
+run = ["git", "rebase", "--continue"]
+
+[recipe.git-rebase-abort]
+description = "Cancel an in-progress rebase and return to the previous state"
+run = ["git", "rebase", "--abort"]
