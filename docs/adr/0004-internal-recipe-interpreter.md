@@ -202,5 +202,5 @@ decision: `rmcp`'s `#[tool_router]` builds its router at compile time
 from static `#[tool]` annotations, so per-recipe tools would require
 constructing `Tool` definitions and dispatch by hand at runtime rather
 than via the macro this codebase otherwise relies on throughout
-`text/src/mcp/`. That is a larger, separate change and is left for a
-future ADR if pursued.
+`text/src/mcp/`. That is a larger, separate change; see
+[ADR 0005](0005-per-recipe-mcp-tools.md), which makes it.
