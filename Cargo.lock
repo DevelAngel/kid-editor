@@ -1099,6 +1099,7 @@ dependencies = [
  "glob",
  "indexmap",
  "indoc",
+ "recipe",
  "rmcp",
  "secrecy",
  "serde",

@@ -1,5 +1,7 @@
-use crate::mcp::{IgnorePattern, McpService, RecipeName};
+use crate::mcp::{IgnorePattern, JustRecipeName, McpService, discover_recipes};
 use crate::oauth::{self, McpClientsConfig, McpOAuthStore};
+
+use recipe::RecipeFile;
 
 use anyhow::Result;
 use axum::Router;
@@ -33,6 +35,7 @@ pub struct McpServer {
     allowed_origins: Vec<Url>,
     ignore: Vec<IgnorePattern>,
     enable_just_run: bool,
+    recipes_file: Option<PathBuf>,
 }
 
 impl McpServer {
@@ -70,7 +73,7 @@ impl McpServer {
         let ignore = self.ignore;
 
         let just_recipes = if self.enable_just_run {
-            let just_recipes = RecipeName::discover(&workspace_root);
+            let just_recipes = JustRecipeName::discover(&workspace_root);
             let justfiles = find_justfiles(&workspace_root, &ignore);
             match just_recipes.len() {
                 0 => tracing::warn!("just_run tool disabled: no justfile or no recipes found"),
@@ -104,12 +107,50 @@ impl McpServer {
             BTreeMap::new()
         };
 
+        let recipes = if let Some(recipes_file) = &self.recipes_file {
+            let recipes_path = if recipes_file.is_absolute() {
+                recipes_file.clone()
+            } else {
+                workspace_root.join(recipes_file)
+            };
+            if recipes_path.is_file() {
+                let recipes = discover_recipes(&recipes_path);
+                match recipes.iter().count() {
+                    0 => tracing::warn!(
+                        "recipe_run tool disabled: {} has no recipes",
+                        recipes_path.display()
+                    ),
+                    n => {
+                        tracing::warn!("recipe_run tool enabled and discovered {n} recipes");
+                        recipes.iter().for_each(|(name, recipe)| {
+                            tracing::info!("recipe '{name}': {}", recipe.description);
+                        });
+                    }
+                }
+                tracing::warn!(
+                    "{} hidden and write-protected (see ADR 0003, ADR 0004)",
+                    recipes_path.display()
+                );
+                recipes
+            } else {
+                tracing::warn!(
+                    "recipe_run tool disabled: {} does not exist",
+                    recipes_path.display()
+                );
+                RecipeFile::default()
+            }
+        } else {
+            tracing::warn!("recipe_run tool disabled (pass --recipes-file <FILE> to enable it)");
+            RecipeFile::default()
+        };
+
         let mcp_service = StreamableHttpService::new(
             move || {
                 Ok(McpService::new(
                     workspace_root.clone(),
                     ignore.clone(),
                     just_recipes.clone(),
+                    recipes.clone(),
                 ))
             },
             LocalSessionManager::default().into(),

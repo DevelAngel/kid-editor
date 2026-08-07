@@ -49,7 +49,7 @@ impl McpService {
         }
 
         let updated = content.replacen(&input.old_str, &input.new_str, 1);
-        let write = path.into_write_buffer(self.protect_justfiles)?;
+        let write = path.into_write_buffer(self.protect_justfiles, self.protect_recipe_toml)?;
         write
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
@@ -64,13 +64,19 @@ impl McpService {
 mod tests {
     use super::*;
     use assert_fs::TempDir;
+    use recipe::RecipeFile;
     use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
     fn str_replace_requires_unique_match() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            BTreeMap::new(),
+            RecipeFile::default(),
+        );
         fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
         let result = svc.str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),
@@ -83,7 +89,12 @@ mod tests {
     #[test]
     fn str_replace_replaces_unique_match() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], BTreeMap::new());
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            BTreeMap::new(),
+            RecipeFile::default(),
+        );
         fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
         svc.str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),

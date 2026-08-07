@@ -41,7 +41,8 @@ sha2 = { version = "0.11.0", features = ["zeroize"] }
 uuid = { version = "1.24.0", features = ["atomic", "serde", "v4", "v7", "zerocopy"] }
 derive_more = { version = "2.1.1", features = ["deref", "display", "from", "from_str"] }
 serde_urlencoded = "0.7.1"
-toml = "1.1.4"
+toml.workspace = true
+recipe = { path = "../recipe" }
 
 [dev-dependencies]
 assert_fs.workspace = true

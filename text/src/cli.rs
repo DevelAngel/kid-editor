@@ -14,34 +14,27 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 #[clap(group = ArgGroup::new("oauth").required(true).args(&["oauth-disabled", "oauth-clients-file"]))]
 pub struct Cli {
-    /// Sets the workspace which will be served
+    /// Directory to serve
     #[clap(value_name = "DIR", value_hint = ValueHint::DirPath)]
     pub workspace_root: PathBuf,
 
-    /// Sets the address the MCP server listens on.
+    /// Address to listen on
     #[clap(long = "listen", default_value_t = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9300))]
     pub addr: SocketAddr,
 
-    /// This server's own public URL, used when issuing OAuth metadata
-    /// (issuer, authorization/token endpoints), e.g. "https://mcp.example.com".
+    /// This server's own public URL (used for OAuth)
     #[clap(long, value_name = "URL", value_hint = ValueHint::Url, default_value = "http://localhost:9300")]
     pub base_url: Url,
 
-    /// Origins allowed to access the MCP server cross-origin, e.g.
-    /// "https://example.ai". Can be repeated or comma-separated.
+    /// Extra origins allowed to connect from a browser
     #[clap(long = "allowed-origin", value_name = "URL", value_hint = ValueHint::Url, value_delimiter = ',')]
     #[cfg_attr(debug_assertions, clap(default_value = "http://localhost/"))]
     pub allowed_origins: Vec<Url>,
 
-    /// Directory/file glob patterns invisible to every tool — treated as
-    /// nonexistent, not just hidden from `tree`, e.g. ".git", "target", or
-    /// "*.log". Matched against every path component at any depth unless
-    /// prefixed with "/", which anchors the pattern to the workspace's
-    /// top level only (e.g. "/README.md" hides just the top-level file,
-    /// not "sub/README.md"). Can be repeated or comma-separated.
-    ///
-    /// `justfile` and `*.just` are handled separately, not through this
-    /// list — see `--enable-just-run` and ADR 0003.
+    /// Files and folders to hide from every tool, e.g. ".git", "target"
+    // `justfile`/`*.just` and the file passed via `--recipes-file` are
+    // hidden separately, not through this list — see `--enable-just-run`
+    // and `--recipes-file` below (ADR 0003/ADR 0004).
     #[clap(
         long,
         value_name = "PATTERN",
@@ -53,25 +46,28 @@ pub struct Cli {
     )]
     pub ignore: Vec<IgnorePattern>,
 
-    /// Additional glob patterns appended to `--ignore`'s list (default or
-    /// custom), instead of replacing it. Use this to add patterns without
-    /// having to repeat the whole default list. Same syntax as `--ignore`.
-    /// Can be repeated or comma-separated.
+    /// Extra patterns to add to --ignore's list, instead of replacing it
     #[clap(long = "extra-ignore", value_name = "PATTERN", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
     pub extra_ignore: Vec<IgnorePattern>,
 
-    /// Enable the `just_run` tool. Off by default: a `justfile` in the
-    /// workspace is not enough on its own, since discovering recipes
-    /// automatically would mean trusting whatever recipes happen to be
-    /// there without a human ever having looked. Passing this flag is
-    /// that look — it means someone reviewed the workspace's `justfile`
-    /// and decided its recipes are fine to expose. Once set, recipe
-    /// discovery runs and the `just_run` tool is offered if any recipes
-    /// were found; `justfile`/`*.just` also become invisible and
-    /// read-only through this server, everywhere in the workspace, at
-    /// the same time — see ADR 0003.
+    /// Let the AI run commands defined in this workspace's `justfile`
+    // Off by default: a `justfile` alone isn't enough, since offering it
+    // automatically would mean trusting whatever commands happen to be
+    // in there without anyone having looked. This flag is that look —
+    // pass it once you've reviewed `justfile` yourself. From then on,
+    // `justfile`/`*.just` are also hidden and read-only through this
+    // server (see ADR 0003), so the AI can't edit its own permissions.
     #[clap(long)]
     pub enable_just_run: bool,
+
+    /// Let the AI run commands defined in this TOML recipe file
+    // Same reasoning as --enable-just-run, for a simpler, `just`-free
+    // command format (see ADR 0004). Needs both: this flag set, and the
+    // file present at startup. That file also becomes hidden and
+    // read-only through this server from then on. Independent of
+    // --enable-just-run — either, neither, or both can be active.
+    #[clap(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    pub recipes_file: Option<PathBuf>,
 
     #[command(flatten)]
     pub oauth: OauthOptions,
@@ -82,13 +78,13 @@ pub struct Cli {
 
 #[derive(Debug, Args)]
 pub struct OauthOptions {
-    /// Disable OAuth authorization
+    /// Skip login — anyone who can reach this server can use it
     #[arg(long = "disable-oauth", id = "oauth-disabled")]
     pub disabled: bool,
 
-    /// TOML file listing MCP clients allowed to authenticate against the MCP server
-    /// If unset or empty, MCP OAuth is effectively disabled:
-    /// no client can complete the authorization flow.
+    /// File listing which apps are allowed to log in
+    // If unset or empty, login is effectively disabled: no client can
+    // complete the authorization flow.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, id = "oauth-clients-file")]
     pub clients_file: Option<std::path::PathBuf>,
 }

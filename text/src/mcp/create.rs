@@ -27,7 +27,7 @@ impl McpService {
         Parameters(input): Parameters<CreateInput>,
     ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        let write = path.into_write_buffer(self.protect_justfiles)?;
+        let write = path.into_write_buffer(self.protect_justfiles, self.protect_recipe_toml)?;
         write
             .open()
             .and_then(|mut file| file.write_all(input.file_text.as_bytes()))
