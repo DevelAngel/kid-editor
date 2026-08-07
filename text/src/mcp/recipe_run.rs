@@ -1,45 +1,36 @@
-//! Runs recipes from an explicitly configured `recipes.toml`, entirely
-//! independent of `just_run`/`justfile` (see `just_run.rs`). Both tools
-//! can be active at once — this one exists to be adopted gradually, not
-//! to replace the other on day one. See ADR 0004.
+//! Exposes one MCP tool per recipe from an explicitly configured
+//! `recipes.toml`, instead of a single generic `recipe_run(name, args)`.
+//! Per-recipe tools let an MCP client grant or deny each recipe
+//! individually — a client that only trusts `check` and `test` can
+//! allow those two and leave everything else, including `git-commit`,
+//! unapproved. A single generic tool can't express that: approving it
+//! approves every recipe behind it at once. See ADR 0005.
+//!
+//! This can't go through `#[tool_router]` like every other tool in this
+//! module tree — that macro builds its router from static `#[tool]`
+//! annotations at compile time, and the set of recipes (hence the set of
+//! tools) is only known once `recipes.toml` is read at startup. Tools
+//! are therefore built and dispatched by hand here, called directly from
+//! `McpService::list_tools`/`call_tool` rather than through
+//! `tool_router`.
 
-use super::McpService;
+use recipe::{Recipe, RecipeFile, RecipeName};
 
-use recipe::{Recipe, RecipeFile};
-
-use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError};
-use rmcp::schemars::{self, JsonSchema};
-use rmcp::{tool, tool_router};
-use serde::Deserialize;
+use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError, JsonObject, Tool};
+use serde_json::{Map, Value, json};
 
 use std::path::Path;
+use std::sync::Arc;
 
-/// Same truncation policy as `just_run` — a runaway or chatty recipe
-/// shouldn't flood the response.
+/// The prefix every generated tool name gets, so a recipe can never
+/// collide with one of this server's fixed tool names (`view`, `create`,
+/// `just_run`, ...) — even a recipe literally named `view` becomes
+/// `recipe_view`, not `view`.
+const TOOL_PREFIX: &str = "recipe_";
+
+/// Same truncation policy as every other command-running tool here — a
+/// runaway or chatty recipe shouldn't flood the response.
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
-
-/// A recipe name, as sent by a tool call. Not checked for existence at
-/// deserialization — the actual proof is the handler's lookup against
-/// `self.recipes` (see ADR 0003's proof-of-existence rationale, which
-/// applies here the same way, just without a type-level guarantee since
-/// `recipe::RecipeName` is publicly constructable for the standalone
-/// `recipe` CLI's sake).
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
-#[serde(transparent)]
-pub struct RecipeName(String);
-
-impl RecipeName {
-    fn as_lib(&self) -> recipe::RecipeName {
-        recipe::RecipeName::from(self.0.as_str())
-    }
-}
-
-impl std::fmt::Display for RecipeName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 /// Loads `path`. Empty file if it doesn't exist or fails to parse — a
 /// broken recipe file should degrade the feature, not crash the server.
@@ -56,45 +47,127 @@ pub fn discover(path: &Path) -> RecipeFile {
     }
 }
 
-#[derive(Debug, Deserialize, JsonSchema)]
-struct RecipeRunInput {
-    /// Name of a recipe to run.
-    recipe: RecipeName,
-    /// Positional arguments, in the recipe's declared parameter order.
-    #[serde(default)]
-    args: Vec<String>,
+/// MCP tool names allow `[A-Za-z0-9_]`; recipe names use `-` (see
+/// `recipes.toml`). Deterministic and mechanical, not meant to be
+/// reversed — `find` below matches by recomputing this from each known
+/// recipe rather than parsing a tool name back into one.
+fn tool_name(name: &RecipeName) -> String {
+    format!("{TOOL_PREFIX}{}", name.as_str().replace('-', "_"))
 }
 
-#[tool_router(router = recipe_run_tool_router, vis = "pub(super)")]
-impl McpService {
-    #[tool(description = "Run a recipe declared in this workspace's configured recipes.toml.")]
-    fn recipe_run(
-        &self,
-        Parameters(input): Parameters<RecipeRunInput>,
-    ) -> Result<CallToolResult, McpError> {
-        let Some(found) = self.recipes.get(&input.recipe.as_lib()) else {
-            return Err(McpError::invalid_params(
-                format!("{}: no such recipe", input.recipe),
-                None,
-            ));
-        };
+/// One [`Tool`] per recipe in `recipes`, each with a hand-built
+/// object schema: one required string property per declared parameter,
+/// in the recipe's own order, described by that parameter's `help`.
+pub fn tools(recipes: &RecipeFile) -> Vec<Tool> {
+    recipes
+        .iter()
+        .map(|(name, recipe)| {
+            let properties: Map<String, Value> = recipe
+                .args
+                .iter()
+                .map(|(arg, info)| {
+                    let schema = match info.help.as_str() {
+                        "" => json!({"type": "string"}),
+                        help => json!({"type": "string", "description": help}),
+                    };
+                    (arg.clone(), schema)
+                })
+                .collect();
+            let required: Vec<Value> = recipe
+                .args
+                .keys()
+                .map(|arg| Value::String(arg.clone()))
+                .collect();
+            let schema = json!({
+                "type": "object",
+                "properties": properties,
+                "required": required,
+            });
+            let Value::Object(schema) = schema else {
+                unreachable!("json!({{...}}) with object literal always produces Value::Object");
+            };
+            Tool::new(
+                tool_name(name),
+                description(recipe),
+                Arc::new(schema),
+            )
+        })
+        .collect()
+}
 
-        let output = found
-            .execute(&input.args, &self.workspace_root)
-            .map_err(|e| McpError::internal_error(format!("failed to run recipe: {e}"), None))?;
-
-        let stdout = truncated(&output.stdout);
-        let stderr = truncated(&output.stderr);
-        let status = output
-            .status
-            .code()
-            .map(|code| code.to_string())
-            .unwrap_or_else(|| "terminated by signal".to_owned());
-
-        Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "exit status: {status}\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
-        ))]))
+/// One line, for the tool's own `description` — what it runs and what
+/// it takes, since the recipe's name alone (now the tool's name) no
+/// longer needs restating the way the old `recipe_run` list did.
+fn description(recipe: &Recipe) -> String {
+    let mut line = if recipe.description.is_empty() {
+        "Run this recipe.".to_owned()
+    } else {
+        recipe.description.clone()
+    };
+    if !recipe.args.is_empty() {
+        let params = recipe
+            .args
+            .iter()
+            .map(|(arg, info)| match info.help.as_str() {
+                "" => arg.clone(),
+                help => format!("{arg} ({help})"),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        line.push_str(&format!(" Parameters: {params}."));
     }
+    line
+}
+
+/// Runs the recipe behind `tool_name`, if any is currently offered.
+/// `Ok(None)` (not an error) means `tool_name` isn't one of ours — the
+/// caller (`McpService::call_tool`) falls through to `tool_router` for
+/// every other tool, so an unrecognized name here isn't necessarily a
+/// dead end.
+pub fn call(
+    recipes: &RecipeFile,
+    tool_name_requested: &str,
+    arguments: Option<&JsonObject>,
+    workspace_root: &Path,
+) -> Option<Result<CallToolResult, McpError>> {
+    let (_, recipe) = recipes
+        .iter()
+        .find(|(name, _)| tool_name(name) == tool_name_requested)?;
+
+    Some(run(recipe, arguments, workspace_root))
+}
+
+fn run(
+    recipe: &Recipe,
+    arguments: Option<&JsonObject>,
+    workspace_root: &Path,
+) -> Result<CallToolResult, McpError> {
+    let mut provided = Vec::with_capacity(recipe.args.len());
+    for arg in recipe.args.keys() {
+        let value = arguments
+            .and_then(|args| args.get(arg))
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                McpError::invalid_params(format!("missing required argument `{arg}`"), None)
+            })?;
+        provided.push(value.to_owned());
+    }
+
+    let output = recipe
+        .execute(&provided, workspace_root)
+        .map_err(|e| McpError::internal_error(format!("failed to run recipe: {e}"), None))?;
+
+    let stdout = truncated(&output.stdout);
+    let stderr = truncated(&output.stderr);
+    let status = output
+        .status
+        .code()
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "terminated by signal".to_owned());
+
+    Ok(CallToolResult::success(vec![ContentBlock::text(format!(
+        "exit status: {status}\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
+    ))]))
 }
 
 fn truncated(bytes: &[u8]) -> String {
@@ -107,39 +180,6 @@ fn truncated(bytes: &[u8]) -> String {
             bytes.len()
         )
     }
-}
-
-/// Formats one recipe as a line for the tool description's recipe list
-/// (see `McpService::list_tools`): `name arg1 arg2: description (args:
-/// arg1 — help; arg2 — help)`, with the `description` and `(args: ...)`
-/// segments only present when non-empty.
-pub fn describe(name: &recipe::RecipeName, recipe: &Recipe) -> String {
-    let params = recipe
-        .args
-        .keys()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut line = match params.as_str() {
-        "" => name.to_string(),
-        params => format!("{name} {params}"),
-    };
-    if !recipe.description.is_empty() {
-        line.push_str(&format!(": {}", recipe.description));
-    }
-    if !recipe.args.is_empty() {
-        let help = recipe
-            .args
-            .iter()
-            .map(|(arg, info)| match info.help.as_str() {
-                "" => arg.clone(),
-                help => format!("{arg} — {help}"),
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        line.push_str(&format!(" (args: {help})"));
-    }
-    format!("- {line}")
 }
 
 #[cfg(test)]
@@ -162,9 +202,43 @@ mod tests {
         assert!(!file.is_empty(), "expected recipes.toml to declare recipes");
         for name in ["check", "lint", "test", "test-one", "git-commit"] {
             assert!(
-                file.get(&recipe::RecipeName::from(name)).is_some(),
+                file.get(&RecipeName::from(name)).is_some(),
                 "expected recipe {name:?} to be declared"
             );
         }
+    }
+
+    #[test]
+    fn tool_name_replaces_hyphens_with_underscores() {
+        assert_eq!(
+            tool_name(&RecipeName::from("git-commit")),
+            "recipe_git_commit"
+        );
+    }
+
+    #[test]
+    fn tools_prefixes_and_carries_one_property_per_arg() {
+        let file = discover(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../recipes.toml"),
+        );
+        let generated = tools(&file);
+        let commit = generated
+            .iter()
+            .find(|t| t.name == "recipe_git_commit")
+            .expect("expected a recipe_git_commit tool");
+        assert_eq!(
+            commit.input_schema.get("required"),
+            Some(&Value::Array(vec![Value::String("message".to_owned())]))
+        );
+    }
+
+    #[test]
+    fn call_runs_matching_recipe_and_none_for_unknown_name() {
+        let toml_text = "[recipe.check]\nrun = [\"echo\", \"hi\"]\n";
+        let file: RecipeFile = toml::from_str(toml_text).unwrap();
+        let root = assert_fs::TempDir::new().unwrap();
+
+        assert!(call(&file, "recipe_check", None, root.path()).is_some());
+        assert!(call(&file, "recipe_missing", None, root.path()).is_none());
     }
 }

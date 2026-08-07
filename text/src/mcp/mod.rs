@@ -136,17 +136,10 @@ impl ServerHandler for McpService {
             just_run.description =
                 Some(Cow::Owned(format!("{base} Available recipes:\n{recipes}")));
         }
-        if let Some(recipe_run) = tools.iter_mut().find(|tool| tool.name == "recipe_run") {
-            let base = recipe_run.description.as_deref().unwrap_or_default();
-            let recipes = self
-                .recipes
-                .iter()
-                .map(|(name, recipe)| recipe_run::describe(name, recipe))
-                .collect::<Vec<_>>()
-                .join("\n");
-            recipe_run.description =
-                Some(Cow::Owned(format!("{base} Available recipes:\n{recipes}")));
-        }
+        // One tool per `--recipes-file` recipe (see ADR 0005), not
+        // routed through `tool_router` — appended here instead of
+        // enriching a single description, unlike `just_run` above.
+        tools.extend(recipe_run::tools(&self.recipes));
         Ok(ListToolsResult::with_all_items(tools))
     }
 
@@ -161,11 +154,13 @@ impl ServerHandler for McpService {
                 None,
             ));
         }
-        if request.name == "recipe_run" && !self.protect_recipe_toml {
-            return Err(McpError::invalid_params(
-                "recipe_run is disabled. If it previously appeared in your tool list, that list is now stale.",
-                None,
-            ));
+        if let Some(result) = recipe_run::call(
+            &self.recipes,
+            &request.name,
+            request.arguments.as_ref(),
+            &self.workspace_root,
+        ) {
+            return result.map(Into::into);
         }
         self.tool_router
             .call(ToolCallContext::new(self, request, context))
@@ -200,7 +195,6 @@ impl McpService {
 
         let protect_recipe_toml = !recipes.is_empty();
         if protect_recipe_toml {
-            tool_router += Self::recipe_run_tool_router();
             ignore.extend(IgnorePattern::recipe_file_patterns());
         }
 
