@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.5.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.4.0..v0.5.0) - 2026-08-08
+
+### Bug Fixes
+
+- **(mcp)** protect recipes-file by exact path, only if inside - ([c28c92c](https://github.com/DevelAngel/matrix-mcp/commit/c28c92c326df83261439ca4db2eaa14e3328d00f)) - Angelos Drossos
+
+### Documentation
+
+- **(adr)** add ADR 0005 for per-recipe MCP tools - ([0131f5b](https://github.com/DevelAngel/matrix-mcp/commit/0131f5ba3f64ae5f9e04e177484fe875905f467a)) - Angelos Drossos
+- add internal recipe interpreter ADR - ([77380ee](https://github.com/DevelAngel/matrix-mcp/commit/77380ee9a9a090c02eb58a57fd38148876b52fea)) - Angelos Drossos
+
+### Features
+
+- **(mcp)** add recipe_run tool alongside just_run - ([c39f97b](https://github.com/DevelAngel/matrix-mcp/commit/c39f97bce846381a03aa21dcdd155587b7038719)) - Angelos Drossos
+- **(mcp)** replace recipe_run with per-recipe MCP tools - ([0ac5194](https://github.com/DevelAngel/matrix-mcp/commit/0ac519436efc52e1a92aadbf62fc3a24684b7c66)) - Angelos Drossos
+- **(recipe)** add TOML recipe interpreter crate - ([974e23c](https://github.com/DevelAngel/matrix-mcp/commit/974e23c5e8555fb0f05db73222c0af54badc51ac)) - Angelos Drossos
+
+### Miscellaneous Chores
+
+- add recipes.toml for the recipe_run tool - ([e8e3650](https://github.com/DevelAngel/matrix-mcp/commit/e8e3650b46783a1b20fbae63d2918f2dd761fe2b)) - Angelos Drossos
+
 ## [0.4.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.3.0..v0.4.0) - 2026-08-06
 
 ### Bug Fixes
