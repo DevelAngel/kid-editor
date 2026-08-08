@@ -32,16 +32,17 @@ You shouldn't have to choose at all.
 Together, they mirror what a careful person does when they sit down with an unfamiliar project:
 look around, read closely, change precisely.
 
-- `tree` gives the overview — the shape of the project, at a glance, the way the Unix command of the same name always has.
-- `view` shows a file with line numbers, or a slice of one, or a directory's contents.
-- `str_replace` changes exactly one thing:
+- `fs_tree` gives the overview — the shape of the project, at a glance, the way the Unix command of the same name always has.
+- `fs_view` shows a file with line numbers, or a slice of one, or a directory's contents.
+- `fs_str_replace` changes exactly one thing:
   it demands that the text you're replacing appears exactly once.
   Show up twice, and the edit is refused—not silently guessed at, refused, with a request for more context.
-- `create` writes a new file, or overwrites an old one, on purpose.
-- `insert` adds text after a given line.
+- `fs_create` writes a new file, or overwrites an old one, on purpose.
+- `fs_insert` adds text after a given line.
 
 Five tools. Not fifty.
 That's not an accident — it's the whole design philosophy, stated as a list.
+The `fs_` prefix says what they have in common: every one of them touches the filesystem, nothing else — a separate `recipe_<name>` tool per configured recipe (see ADR 0004/0005) carries its own prefix instead, so a client can tell "runs a command" apart from "touches a file" at a glance.
 
 ## Why it matters
 
