@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.6.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.5.0..v0.6.0) - 2026-08-08
+
+### Miscellaneous Chores
+
+- remove unused justfile and helper.rs - ([ccdf6af](https://github.com/DevelAngel/matrix-mcp/commit/ccdf6afd4188e2fe9acbe9a48221e72f34825b60)) - Angelos Drossos
+
+### Refactoring
+
+- **(mcp)** [**breaking**] remove just_run tool - ([842cc3f](https://github.com/DevelAngel/matrix-mcp/commit/842cc3fb05f927944c59821bb15b2a9cc933b5a1)) - Angelos Drossos
+
 ## [0.5.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.4.0..v0.5.0) - 2026-08-08
 
 ### Bug Fixes

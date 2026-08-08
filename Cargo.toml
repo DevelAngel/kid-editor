@@ -3,7 +3,7 @@ resolver = "3"
 members = ["text", "recipe"]
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.97.1"
 authors = ["Angelos Drossos"]
