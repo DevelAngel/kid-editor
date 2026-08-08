@@ -22,7 +22,7 @@ impl McpService {
     #[tool(
         description = "Create a file with the given content, overwriting it if it already exists"
     )]
-    fn create(
+    fn fs_create(
         &self,
         Parameters(input): Parameters<CreateInput>,
     ) -> Result<CallToolResult, McpError> {
