@@ -23,7 +23,7 @@ pub struct StrReplaceInput {
 #[tool_router(router = str_replace_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(description = "Replace an exact, unique occurrence of old_str with new_str in a file")]
-    fn str_replace(
+    fn fs_str_replace(
         &self,
         Parameters(input): Parameters<StrReplaceInput>,
     ) -> Result<CallToolResult, McpError> {
@@ -72,7 +72,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
-        let result = svc.str_replace(Parameters(StrReplaceInput {
+        let result = svc.fs_str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),
             old_str: "foo".into(),
             new_str: "bar".into(),
@@ -85,7 +85,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
-        svc.str_replace(Parameters(StrReplaceInput {
+        svc.fs_str_replace(Parameters(StrReplaceInput {
             path: UnresolvedPath::new("f.txt"),
             old_str: "foo".into(),
             new_str: "bar".into(),

@@ -22,7 +22,10 @@ impl McpService {
     #[tool(
         description = "View a file's contents (numbered lines, optionally a line range) or list a directory's entries"
     )]
-    fn view(&self, Parameters(input): Parameters<ViewInput>) -> Result<CallToolResult, McpError> {
+    fn fs_view(
+        &self,
+        Parameters(input): Parameters<ViewInput>,
+    ) -> Result<CallToolResult, McpError> {
         let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
         let metadata = path.metadata().map_err(|e| not_found_or_io(&path, e))?;
 

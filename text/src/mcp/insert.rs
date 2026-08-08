@@ -21,7 +21,7 @@ pub struct InsertInput {
 #[tool_router(router = insert_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(description = "Insert text after a given line number (0 = start of file)")]
-    fn insert(
+    fn fs_insert(
         &self,
         Parameters(input): Parameters<InsertInput>,
     ) -> Result<CallToolResult, McpError> {
@@ -70,7 +70,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
-        svc.insert(Parameters(InsertInput {
+        svc.fs_insert(Parameters(InsertInput {
             path: UnresolvedPath::new("f.txt"),
             insert_line: 1,
             new_str: "x".into(),
