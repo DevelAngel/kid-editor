@@ -48,9 +48,12 @@ Each recipe becomes a tool named `recipe_<name>`, with `-` replaced by
 `_` (MCP tool names are restricted to `[A-Za-z0-9_]`; recipe names use
 `-`, see `recipes.toml`). The `recipe_` prefix guarantees no collision
 with this server's fixed tool names, even for a recipe literally named
-`view` or `create`. Each tool's input schema is built by hand from the
-recipe's own `args`: one required string property per declared
-parameter, named and described from that parameter's `help`.
+`fs_view` or `fs_create` (see the later `fs_` prefix decision for those
+— this ADR's collision argument predates it but the guarantee holds
+either way, since the two prefixes are disjoint by construction). Each
+tool's input schema is built by hand from the recipe's own `args`: one
+required string property per declared parameter, named and described
+from that parameter's `help`.
 
 `McpService::list_tools` and `call_tool` call into a small
 `recipe_run::tools`/`recipe_run::call` pair directly, alongside — not

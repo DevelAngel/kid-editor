@@ -23,9 +23,12 @@ struct TreeInput {
 #[tool_router(router = tree_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Show a directory as a tree, like the Unix `tree` command — faster overview than repeated `view` calls"
+        description = "Show a directory as a tree, like the Unix `tree` command — faster overview than repeated `fs_view` calls"
     )]
-    fn tree(&self, Parameters(input): Parameters<TreeInput>) -> Result<CallToolResult, McpError> {
+    fn fs_tree(
+        &self,
+        Parameters(input): Parameters<TreeInput>,
+    ) -> Result<CallToolResult, McpError> {
         let resolved = input
             .path
             .map(|p| p.resolve(&self.workspace_root, &self.ignore))
@@ -161,7 +164,7 @@ mod tests {
 
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         let result = svc
-            .tree(Parameters(TreeInput {
+            .fs_tree(Parameters(TreeInput {
                 path: None,
                 max_depth: None,
             }))
@@ -199,7 +202,7 @@ mod tests {
             None,
         );
         let result = svc
-            .tree(Parameters(TreeInput {
+            .fs_tree(Parameters(TreeInput {
                 path: None,
                 max_depth: None,
             }))
@@ -228,7 +231,7 @@ mod tests {
 
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         let result = svc
-            .tree(Parameters(TreeInput {
+            .fs_tree(Parameters(TreeInput {
                 path: None,
                 max_depth: Some(1),
             }))
