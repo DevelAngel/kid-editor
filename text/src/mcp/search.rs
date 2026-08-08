@@ -5,6 +5,8 @@ use anyhow::Result;
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
+use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
+use nucleo_matcher::{Config, Matcher, Utf32Str};
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError};
 use rmcp::schemars::{self, JsonSchema};
@@ -15,22 +17,38 @@ use std::fmt::{self, Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Default, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum SearchMode {
+    /// Literal substring match
+    #[default]
+    Exact,
+    /// Approximate, typo-tolerant match ranked by relevance
+    Fuzzy,
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 struct SearchInput {
-    /// Exact text to search for (matched literally, not as a regex)
+    /// Text to search for — a literal substring in "exact" mode, an
+    /// approximate pattern in "fuzzy" mode
     query: String,
     /// File or directory to search in, relative or absolute (default: workspace root)
     #[serde(default)]
     path: Option<UnresolvedPath>,
-    /// Case-insensitive match (default: false)
+    /// Case-insensitive match — "exact" mode only, ignored in "fuzzy" mode
+    /// which already matches case-insensitively unless the query itself
+    /// contains an uppercase letter (default: false)
     #[serde(default)]
     case_insensitive: bool,
+    /// Search mode (default: exact)
+    #[serde(default)]
+    mode: SearchMode,
 }
 
 #[tool_router(router = search_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Search file contents for an exact substring, like `grep -F` — faster and more precise than reading files to look for text"
+        description = "Search file contents for text — \"exact\" mode is a literal substring match like `grep -F`, \"fuzzy\" mode tolerates typos and ranks results by relevance. Faster and more precise than reading files to look for text."
     )]
     fn fs_search(
         &self,
@@ -42,8 +60,16 @@ impl McpService {
             .transpose()?
             .unwrap_or_else(|| WorkspacePath::root(&self.workspace_root));
 
-        let search = WorkspaceSearch::new(&input.query, input.case_insensitive)?;
-        let matches = search.run(&root, &self.ignore)?;
+        let matches = match input.mode {
+            SearchMode::Exact => {
+                let search = WorkspaceSearch::new(&input.query, input.case_insensitive)?;
+                search.run(&root, &self.ignore)?
+            }
+            SearchMode::Fuzzy => {
+                let mut search = FuzzySearch::new(&input.query);
+                search.run(&root, &self.ignore)?
+            }
+        };
 
         if matches.is_empty() {
             return Ok(CallToolResult::success(vec![ContentBlock::text(
@@ -175,6 +201,112 @@ impl WorkspaceSearch {
     }
 }
 
+/// Recursively fuzzy-matches every line under a [`WorkspacePath`] against
+/// a query, honoring the same ignore rules as `fs_tree`. Results are
+/// ranked by nucleo's relevance score, best match first; lines that
+/// don't match at all are dropped rather than scored zero.
+struct FuzzySearch {
+    pattern: Pattern,
+    matcher: Matcher,
+}
+
+impl FuzzySearch {
+    fn new(query: &str) -> Self {
+        Self {
+            pattern: Pattern::parse(query, CaseMatching::Smart, Normalization::Smart),
+            matcher: Matcher::new(Config::DEFAULT),
+        }
+    }
+
+    /// Searches `root` — a file or a directory, walked recursively — and
+    /// returns every match ranked best-first by relevance score.
+    fn run(
+        &mut self,
+        root: &WorkspacePath,
+        ignore: &[IgnorePattern],
+    ) -> Result<Vec<SearchMatch>, McpError> {
+        let metadata = root.metadata().map_err(|e| not_found_or_io(root, e))?;
+        let mut scored = Vec::new();
+        if metadata.is_dir() {
+            self.walk_dir(root.absolute(), root.relative(), 0, ignore, &mut scored)?;
+        } else {
+            self.search_file(root.absolute(), root.relative(), &mut scored);
+        }
+        scored.sort_by(|(a, a_score), (b, b_score)| {
+            b_score
+                .cmp(a_score)
+                .then(a.file.cmp(&b.file))
+                .then(a.line.cmp(&b.line))
+        });
+        Ok(scored.into_iter().map(|(m, _)| m).collect())
+    }
+
+    /// Depth-first walk mirroring `WorkspaceSearch::walk_dir`'s ignore
+    /// handling; kept separate for now, unified once fuzzy and exact
+    /// share one walker.
+    fn walk_dir(
+        &mut self,
+        dir: &Path,
+        relative: &Path,
+        depth: usize,
+        ignore: &[IgnorePattern],
+        scored: &mut Vec<(SearchMatch, u32)>,
+    ) -> Result<(), McpError> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| McpError::internal_error(format!("{}: {e}", dir.display()), None))?;
+        let mut entries: Vec<_> = entries
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                !ignore
+                    .iter()
+                    .any(|pattern| pattern.matches_name_at_depth(&name, depth))
+            })
+            .collect();
+        entries.sort_by_key(|entry| entry.file_name());
+
+        for entry in entries {
+            let child_absolute = entry.path();
+            let child_relative = relative.join(entry.file_name());
+            if child_absolute.is_dir() {
+                self.walk_dir(&child_absolute, &child_relative, depth + 1, ignore, scored)?;
+            } else {
+                self.search_file(&child_absolute, &child_relative, scored);
+            }
+        }
+        Ok(())
+    }
+
+    /// Scores one file's lines, appending matches to `scored`. Files
+    /// that aren't valid UTF-8 (typically binary) are silently skipped.
+    fn search_file(
+        &mut self,
+        absolute: &Path,
+        relative: &Path,
+        scored: &mut Vec<(SearchMatch, u32)>,
+    ) {
+        let Ok(content) = fs::read_to_string(absolute) else {
+            return;
+        };
+        let mut buf = Vec::new();
+        for (index, line) in content.lines().enumerate() {
+            buf.clear();
+            let haystack = Utf32Str::new(line, &mut buf);
+            if let Some(score) = self.pattern.score(haystack, &mut self.matcher) {
+                scored.push((
+                    SearchMatch {
+                        file: relative.to_path_buf(),
+                        line: (index + 1) as u64,
+                        text: line.trim_end().to_owned(),
+                    },
+                    score,
+                ));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,11 +320,21 @@ mod tests {
     }
 
     fn search_text(svc: &McpService, query: &str, case_insensitive: bool) -> String {
+        search_text_mode(svc, query, case_insensitive, SearchMode::Exact)
+    }
+
+    fn search_text_mode(
+        svc: &McpService,
+        query: &str,
+        case_insensitive: bool,
+        mode: SearchMode,
+    ) -> String {
         let result = svc
             .fs_search(Parameters(SearchInput {
                 query: query.to_owned(),
                 path: None,
                 case_insensitive,
+                mode,
             }))
             .unwrap();
         match &result.content[0] {
