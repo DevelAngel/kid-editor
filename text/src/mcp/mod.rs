@@ -5,6 +5,7 @@
 mod create;
 mod insert;
 mod recipe_run;
+mod search;
 mod str_replace;
 mod tree;
 mod view;
@@ -121,6 +122,7 @@ impl McpService {
     ) -> Self {
         let tool_router = Self::create_tool_router()
             + Self::insert_tool_router()
+            + Self::search_tool_router()
             + Self::str_replace_tool_router()
             + Self::tree_tool_router()
             + Self::view_tool_router();

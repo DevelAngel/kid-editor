@@ -243,9 +243,16 @@ impl WorkspacePath {
         }
     }
 
-    #[cfg(test)]
     pub(super) fn absolute(&self) -> &Path {
         &self.absolute
+    }
+
+    /// Workspace-relative path — e.g. `notes/todo.md`, empty for the
+    /// workspace root itself. Unlike [`Display`], this is the path
+    /// component callers can join child names onto while walking a
+    /// directory, not text meant for a human.
+    pub(super) fn relative(&self) -> &Path {
+        &self.relative
     }
 
     pub(super) fn metadata(&self) -> io::Result<Metadata> {
