@@ -39,7 +39,7 @@ name = "cargo test"
 language = "system"
 types = ["rust"]
 pass_filenames = false
-entry = "just test"
+entry = "cargo test"
 # [[repos.hooks]]
 # stages = ["prepare-commit-msg"]
 # id = "git-cliff"
