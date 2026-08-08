@@ -165,6 +165,7 @@ mod tests {
             vec![],
             BTreeMap::new(),
             RecipeFile::default(),
+            None,
         );
         let result = svc
             .tree(Parameters(TreeInput {
@@ -203,6 +204,7 @@ mod tests {
             vec![".git".parse().unwrap(), "target".parse().unwrap()],
             BTreeMap::new(),
             RecipeFile::default(),
+            None,
         );
         let result = svc
             .tree(Parameters(TreeInput {
@@ -237,6 +239,7 @@ mod tests {
             vec![],
             BTreeMap::new(),
             RecipeFile::default(),
+            None,
         );
         let result = svc
             .tree(Parameters(TreeInput {

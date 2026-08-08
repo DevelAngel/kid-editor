@@ -107,7 +107,8 @@ impl McpServer {
             BTreeMap::new()
         };
 
-        let recipes = if let Some(recipes_file) = &self.recipes_file {
+        let (recipes, recipe_toml_protected_path) = if let Some(recipes_file) = &self.recipes_file
+        {
             let recipes_path = if recipes_file.is_absolute() {
                 recipes_file.clone()
             } else {
@@ -127,21 +128,42 @@ impl McpServer {
                         });
                     }
                 }
-                tracing::warn!(
-                    "{} hidden and write-protected (see ADR 0003, ADR 0004)",
-                    recipes_path.display()
-                );
-                recipes
+                // Only a --recipes-file *inside* the workspace needs
+                // hiding/write-refusal here: one outside it is already
+                // unreachable through every other tool in this server,
+                // regardless (see ADR 0004's "More Information"
+                // amendment). Comparing canonicalized paths, not just
+                // string-prefix, so a workspace_root/../sibling-style
+                // --recipes-file isn't mistaken for "inside".
+                let protected = recipes_path
+                    .canonicalize()
+                    .ok()
+                    .and_then(|canonical| {
+                        canonical.strip_prefix(&workspace_root).map(Path::to_path_buf).ok()
+                    });
+                match &protected {
+                    Some(relative) => tracing::warn!(
+                        "{} hidden and write-protected (see ADR 0003, ADR 0004): {}",
+                        recipes_path.display(),
+                        relative.display()
+                    ),
+                    None => tracing::warn!(
+                        "{} is outside the workspace; not hidden or write-protected here \
+                         (already unreachable through every tool in this server)",
+                        recipes_path.display()
+                    ),
+                }
+                (recipes, protected)
             } else {
                 tracing::warn!(
                     "recipe_run tool disabled: {} does not exist",
                     recipes_path.display()
                 );
-                RecipeFile::default()
+                (RecipeFile::default(), None)
             }
         } else {
             tracing::warn!("recipe_run tool disabled (pass --recipes-file <FILE> to enable it)");
-            RecipeFile::default()
+            (RecipeFile::default(), None)
         };
 
         let mcp_service = StreamableHttpService::new(
@@ -151,6 +173,7 @@ impl McpServer {
                     ignore.clone(),
                     just_recipes.clone(),
                     recipes.clone(),
+                    recipe_toml_protected_path.clone(),
                 ))
             },
             LocalSessionManager::default().into(),

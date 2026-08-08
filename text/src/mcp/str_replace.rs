@@ -49,7 +49,7 @@ impl McpService {
         }
 
         let updated = content.replacen(&input.old_str, &input.new_str, 1);
-        let write = path.into_write_buffer(self.protect_justfiles, self.protect_recipe_toml)?;
+        let write = path.into_write_buffer(self.protect_justfiles, self.recipe_toml_protected_path.as_deref())?;
         write
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
@@ -76,6 +76,7 @@ mod tests {
             vec![],
             BTreeMap::new(),
             RecipeFile::default(),
+            None,
         );
         fs::write(dir.path().join("f.txt"), "foo\nfoo\n").unwrap();
         let result = svc.str_replace(Parameters(StrReplaceInput {
@@ -94,6 +95,7 @@ mod tests {
             vec![],
             BTreeMap::new(),
             RecipeFile::default(),
+            None,
         );
         fs::write(dir.path().join("f.txt"), "foo\nbaz\n").unwrap();
         svc.str_replace(Parameters(StrReplaceInput {

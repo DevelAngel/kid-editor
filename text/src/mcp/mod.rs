@@ -42,8 +42,9 @@ pub struct McpService {
     ///
     /// When [`protect_justfiles`](Self::protect_justfiles) is set, this
     /// also includes [`IgnorePattern::justfile_patterns`]; when
-    /// [`protect_recipe_toml`](Self::protect_recipe_toml) is set, it also
-    /// includes [`IgnorePattern::recipe_file_patterns`] — both added here
+    /// [`recipe_toml_protected_path`](Self::recipe_toml_protected_path)
+    /// is `Some`, it also includes an
+    /// [`IgnorePattern::exact_path`] for that one path — both added here
     /// in [`McpService::new`], not via `--ignore`, so protection stays
     /// tied to whether each tool is actually offered rather than to
     /// ordinary, user-editable ignore configuration. The two are
@@ -60,10 +61,15 @@ pub struct McpService {
     /// doc comment and parameter help. Empty map if the workspace has no
     /// `justfile`, or `--enable-just-run` wasn't passed.
     just_recipes: BTreeMap<JustRecipeName, just_run::RecipeInfo>,
-    /// Whether the configured recipe file is write-refused, analogous to
-    /// `protect_justfiles` above but for `recipe_run`/`--recipes-file`
-    /// (see ADR 0004). Independent of `protect_justfiles`.
-    protect_recipe_toml: bool,
+    /// The workspace-relative path of the file passed via
+    /// `--recipes-file`, write-refused (`into_write_buffer`) and folded
+    /// into `ignore` above, if and only if that file actually lies
+    /// inside the workspace. `None` covers both "no `--recipes-file`
+    /// passed" and "passed, but the file is outside the workspace" — the
+    /// latter needs no protection since every tool here already can't
+    /// reach outside the workspace root regardless. See ADR 0004's
+    /// "More Information" amendment.
+    recipe_toml_protected_path: Option<PathBuf>,
     /// Recipes read once at construction time from the path passed via
     /// `--recipes-file`. Empty if that flag wasn't passed or the file
     /// doesn't exist — see ADR 0004.
@@ -174,12 +180,15 @@ impl McpService {
     /// leave the corresponding tool disabled — the defaults, absent
     /// `--enable-just-run` and `--recipes-file` respectively. The two
     /// sources are independent: either, neither, or both may be
-    /// non-empty.
+    /// non-empty. `recipe_toml_protected_path` must already be
+    /// confirmed to lie inside `workspace_root` (relative to it) — see
+    /// `McpServer::serve`, which does that check before calling this.
     pub fn new(
         workspace_root: PathBuf,
         mut ignore: Vec<IgnorePattern>,
         just_recipes: BTreeMap<JustRecipeName, just_run::RecipeInfo>,
         recipes: RecipeFile,
+        recipe_toml_protected_path: Option<PathBuf>,
     ) -> Self {
         let mut tool_router = Self::create_tool_router()
             + Self::insert_tool_router()
@@ -193,9 +202,8 @@ impl McpService {
             ignore.extend(IgnorePattern::justfile_patterns());
         }
 
-        let protect_recipe_toml = !recipes.is_empty();
-        if protect_recipe_toml {
-            ignore.extend(IgnorePattern::recipe_file_patterns());
+        if let Some(protected) = &recipe_toml_protected_path {
+            ignore.push(IgnorePattern::exact_path(protected.clone()));
         }
 
         Self {
@@ -203,7 +211,7 @@ impl McpService {
             ignore,
             protect_justfiles,
             just_recipes,
-            protect_recipe_toml,
+            recipe_toml_protected_path,
             recipes,
             tool_router,
         }

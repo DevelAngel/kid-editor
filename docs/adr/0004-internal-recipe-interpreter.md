@@ -188,7 +188,15 @@ boundary against it are stated in full above (see "Context and Problem
 Statement") specifically so this tool does not depend on ADR 0003
 remaining in force. ADR 0002 (ignore-list-as-nonexistence) is reused for
 whatever file `--recipes-file` points at, the same way ADR 0003 already
-reuses it for `justfile`.
+reuses it for `justfile` — but only when that file actually lies inside
+the workspace. `--recipes-file` may be absolute and point outside it
+(e.g. a recipe file shared across several workspaces); a path outside
+the workspace is already unreachable through every other tool this
+server offers regardless of any ignore list, so there is nothing for
+this protection to add there — and applying it anyway, by filename
+alone, would risk hiding an unrelated same-named file that happens to
+sit inside the workspace. `McpServer::serve` checks this once at
+startup, before the boundary is ever installed.
 
 This project's own build/lint/test/git workflow is not migrated to
 `recipes.toml` as part of this decision — `justfile` remains this
