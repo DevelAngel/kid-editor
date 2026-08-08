@@ -32,9 +32,8 @@ pub struct Cli {
     pub allowed_origins: Vec<Url>,
 
     /// Files and folders to hide from every tool, e.g. ".git", "target"
-    // `justfile`/`*.just` and the file passed via `--recipes-file` are
-    // hidden separately, not through this list — see `--enable-just-run`
-    // and `--recipes-file` below (ADR 0003/ADR 0004).
+    // The file passed via `--recipes-file` is hidden separately, not
+    // through this list — see `--recipes-file` below (ADR 0004).
     #[clap(
         long,
         value_name = "PATTERN",
@@ -49,16 +48,6 @@ pub struct Cli {
     /// Extra patterns to add to --ignore's list, instead of replacing it
     #[clap(long = "extra-ignore", value_name = "PATTERN", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
     pub extra_ignore: Vec<IgnorePattern>,
-
-    /// Let the AI run commands defined in this workspace's `justfile`
-    // Off by default: a `justfile` alone isn't enough, since offering it
-    // automatically would mean trusting whatever commands happen to be
-    // in there without anyone having looked. This flag is that look —
-    // pass it once you've reviewed `justfile` yourself. From then on,
-    // `justfile`/`*.just` are also hidden and read-only through this
-    // server (see ADR 0003), so the AI can't edit its own permissions.
-    #[clap(long)]
-    pub enable_just_run: bool,
 
     /// Let the AI run commands defined in this TOML recipe file
     // Same reasoning as --enable-just-run, for a simpler, `just`-free

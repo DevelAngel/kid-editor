@@ -46,7 +46,7 @@ impl McpService {
         if content.ends_with('\n') {
             updated.push('\n');
         }
-        let write = path.into_write_buffer(self.protect_justfiles, self.recipe_toml_protected_path.as_deref())?;
+        let write = path.into_write_buffer(self.recipe_toml_protected_path.as_deref())?;
         write
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
@@ -63,19 +63,12 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use recipe::RecipeFile;
-    use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
     fn insert_adds_line_after_given_index() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(
-            dir.to_path_buf(),
-            vec![],
-            BTreeMap::new(),
-            RecipeFile::default(),
-            None,
-        );
+        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.insert(Parameters(InsertInput {
             path: UnresolvedPath::new("f.txt"),

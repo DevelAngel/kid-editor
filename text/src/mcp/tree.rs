@@ -150,7 +150,6 @@ mod tests {
     use assert_fs::TempDir;
     use indoc::indoc;
     use recipe::RecipeFile;
-    use std::collections::BTreeMap;
     use std::fs;
 
     #[test]
@@ -160,13 +159,7 @@ mod tests {
         fs::create_dir(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("src/lib.rs"), "").unwrap();
 
-        let svc = McpService::new(
-            dir.to_path_buf(),
-            vec![],
-            BTreeMap::new(),
-            RecipeFile::default(),
-            None,
-        );
+        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,
@@ -202,7 +195,6 @@ mod tests {
         let svc = McpService::new(
             dir.to_path_buf(),
             vec![".git".parse().unwrap(), "target".parse().unwrap()],
-            BTreeMap::new(),
             RecipeFile::default(),
             None,
         );
@@ -234,13 +226,7 @@ mod tests {
         fs::create_dir_all(dir.path().join("a/b")).unwrap();
         fs::write(dir.path().join("a/b/deep.txt"), "").unwrap();
 
-        let svc = McpService::new(
-            dir.to_path_buf(),
-            vec![],
-            BTreeMap::new(),
-            RecipeFile::default(),
-            None,
-        );
+        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         let result = svc
             .tree(Parameters(TreeInput {
                 path: None,

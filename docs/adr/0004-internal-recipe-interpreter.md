@@ -5,6 +5,12 @@ date: 2026-08-06
 
 # Adding an Internal Recipe Interpreter Alongside `just`
 
+> Update: `just_run` was later removed entirely (the alongside-`just`
+> framing below reflects this ADR's original scope, not the current
+> state) — see ADR 0003's superseded notice. Everything below about
+> `recipe_run`'s own design and boundary is unaffected and still
+> current.
+
 ## Context and Problem Statement
 
 `just_run` shells out to an external `just` binary the server does not

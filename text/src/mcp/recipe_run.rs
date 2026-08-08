@@ -86,11 +86,7 @@ pub fn tools(recipes: &RecipeFile) -> Vec<Tool> {
             let Value::Object(schema) = schema else {
                 unreachable!("json!({{...}}) with object literal always produces Value::Object");
             };
-            Tool::new(
-                tool_name(name),
-                description(recipe),
-                Arc::new(schema),
-            )
+            Tool::new(tool_name(name), description(recipe), Arc::new(schema))
         })
         .collect()
 }
@@ -218,9 +214,8 @@ mod tests {
 
     #[test]
     fn tools_prefixes_and_carries_one_property_per_arg() {
-        let file = discover(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../recipes.toml"),
-        );
+        let file =
+            discover(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../recipes.toml"));
         let generated = tools(&file);
         let commit = generated
             .iter()

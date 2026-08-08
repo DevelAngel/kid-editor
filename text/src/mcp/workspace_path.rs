@@ -1,7 +1,8 @@
 //! No tool may touch a path outside the workspace root, or under an
 //! ignored name. [`UnresolvedPath`] is unchecked client input;
 //! [`WorkspacePath`] is proof the check passed; [`WriteBuffer`]
-//! additionally proves the path isn't justfile-like (ADR 0003).
+//! additionally proves the path isn't the configured `--recipes-file`
+//! (ADR 0004).
 
 use glob::{Pattern, PatternError};
 use rmcp::model::ErrorData as McpError;
@@ -38,22 +39,6 @@ pub struct IgnorePattern {
 }
 
 impl IgnorePattern {
-    /// The two conventional `just` recipe-file forms, unanchored (see ADR 0003).
-    pub(crate) fn justfile_patterns() -> [Self; 2] {
-        [
-            Self {
-                anchored: false,
-                glob: Pattern::new("justfile").expect("valid glob literal"),
-                exact: None,
-            },
-            Self {
-                anchored: false,
-                glob: Pattern::new("*.just").expect("valid glob literal"),
-                exact: None,
-            },
-        ]
-    }
-
     /// Protects exactly `relative` — the workspace-relative path of the
     /// file passed via `--recipes-file`, once resolved and confirmed to
     /// actually lie inside the workspace (see `McpServer::serve`; a
@@ -275,44 +260,24 @@ impl WorkspacePath {
         fs::read_to_string(&self.absolute)
     }
 
-    /// Fails if `protect_justfiles` is set and this path names a `just`
-    /// recipe file (`justfile`/`*.just`), or if `protect_recipe_toml` is
-    /// `Some(relative)` and this path is exactly `relative` — the
-    /// workspace-relative location of the file passed via
-    /// `--recipes-file`, already confirmed to lie inside the workspace
-    /// (see `McpServer::serve`; `None` covers both "no recipes file
-    /// configured" and "configured, but outside the workspace" — the
-    /// latter needs no protection here since it's already unreachable
-    /// through every tool in this module). The two checks are
-    /// independent: each tool's file is only protected while that tool
-    /// is actually offered.
+    /// Fails if `protect_recipe_toml` is `Some(relative)` and this path
+    /// is exactly `relative` — the workspace-relative location of the
+    /// file passed via `--recipes-file`, already confirmed to lie inside
+    /// the workspace (see `McpServer::serve`; `None` covers both "no
+    /// recipes file configured" and "configured, but outside the
+    /// workspace" — the latter needs no protection here since it's
+    /// already unreachable through every tool in this module).
     ///
     /// There is no other way to obtain a [`WriteBuffer`], so this is not
     /// something a tool could forget to check.
-    ///
-    /// Even when active, `protect_justfiles` only covers the
-    /// conventional names — a `justfile` importing a file named
-    /// something else entirely would slip past this check. That's a
-    /// known, documented limitation (ADR 0003), not an oversight:
-    /// closing it fully would mean parsing every `justfile` for `import`
-    /// targets, which is more than this check is meant to do.
     pub(super) fn into_write_buffer(
         self,
-        protect_justfiles: bool,
         protect_recipe_toml: Option<&Path>,
     ) -> Result<WriteBuffer, McpError> {
-        if protect_justfiles && is_justfile_like(&self.relative) {
-            return Err(McpError::invalid_params(
-                format!(
-                    "{self}: justfile-like files (`justfile`, `*.just`) are read-only through this server (see ADR 0003)"
-                ),
-                None,
-            ));
-        }
         if protect_recipe_toml.is_some_and(|protected| protected == self.relative) {
             return Err(McpError::invalid_params(
                 format!(
-                    "{self}: the configured recipe file is read-only through this server (see ADR 0003, ADR 0004)"
+                    "{self}: the configured recipe file is read-only through this server (see ADR 0004)"
                 ),
                 None,
             ));
@@ -321,19 +286,7 @@ impl WorkspacePath {
     }
 }
 
-/// `true` for a path whose last component is exactly `justfile` or
-/// matches the glob `*.just` — `just`'s two conventional recipe-file
-/// forms. Used by [`WorkspacePath::into_write_buffer`] as a second,
-/// independent check behind the ignore list (see that method's doc for
-/// why both exist).
-fn is_justfile_like(relative: &Path) -> bool {
-    let Some(name) = relative.file_name().and_then(|n| n.to_str()) else {
-        return false;
-    };
-    name == "justfile" || Pattern::new("*.just").is_ok_and(|p| p.matches(name))
-}
-
-/// A [`WorkspacePath`] proven *not* to be a justfile-like file.
+/// A [`WorkspacePath`] proven *not* to be the protected recipe file.
 /// Only [`WorkspacePath::into_write_buffer`] produces one.
 #[derive(Debug)]
 pub struct WriteBuffer(WorkspacePath);
@@ -708,92 +661,6 @@ mod tests {
     }
 
     #[test]
-    fn into_write_buffer_refuses_the_justfile() {
-        let root = TempDir::new().unwrap();
-        fs::write(root.path().join("justfile"), "check:\n\tcargo check\n").unwrap();
-        let path = UnresolvedPath::new("justfile")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        assert_matches!(
-            path.into_write_buffer(true, None).unwrap_err(),
-            McpError {
-                code: ErrorCode::INVALID_PARAMS,
-                ..
-            }
-        );
-    }
-
-    #[test]
-    fn into_write_buffer_refuses_nested_justfile() {
-        // `import`/`import?` can pull recipes in from anywhere in the
-        // workspace, so the write-refusal can't stop at the top level
-        // (ADR 0003).
-        let root = TempDir::new().unwrap();
-        fs::create_dir_all(root.path().join("sub")).unwrap();
-        fs::write(root.path().join("sub/justfile"), "").unwrap();
-        let path = UnresolvedPath::new("sub/justfile")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        assert_matches!(
-            path.into_write_buffer(true, None).unwrap_err(),
-            McpError {
-                code: ErrorCode::INVALID_PARAMS,
-                ..
-            }
-        );
-    }
-
-    #[test]
-    fn into_write_buffer_allows_justfile_when_protection_disabled() {
-        // Default state (no `--enable-just-run`): with no way to run a
-        // recipe, there is nothing left for editing one to bypass
-        // (ADR 0003).
-        let root = TempDir::new().unwrap();
-        let path = UnresolvedPath::new("justfile")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        let write = path.into_write_buffer(false, None).unwrap();
-        write.open().unwrap().write_all(b"check:\n").unwrap();
-        assert_eq!(
-            fs::read_to_string(root.path().join("justfile")).unwrap(),
-            "check:\n"
-        );
-    }
-
-    #[test]
-    fn justfile_patterns_match_conventional_names_at_any_depth() {
-        let patterns = IgnorePattern::justfile_patterns();
-        for relative in ["justfile", "sub/justfile", "build.just", "recipes/ci.just"] {
-            assert!(
-                patterns.iter().any(|p| p.matches(Path::new(relative))),
-                "expected {relative:?} to match one of the justfile patterns"
-            );
-        }
-        assert!(
-            !patterns
-                .iter()
-                .any(|p| p.matches(Path::new("notes/justfile-notes.md")))
-        );
-    }
-
-    #[test]
-    fn into_write_buffer_refuses_dot_just_files_at_any_depth() {
-        let root = TempDir::new().unwrap();
-        fs::create_dir_all(root.path().join("recipes")).unwrap();
-        fs::write(root.path().join("recipes/build.just"), "").unwrap();
-        let path = UnresolvedPath::new("recipes/build.just")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        assert_matches!(
-            path.into_write_buffer(true, None).unwrap_err(),
-            McpError {
-                code: ErrorCode::INVALID_PARAMS,
-                ..
-            }
-        );
-    }
-
-    #[test]
     fn into_write_buffer_refuses_the_configured_recipe_file() {
         let root = TempDir::new().unwrap();
         fs::write(root.path().join("recipes.toml"), "").unwrap();
@@ -801,7 +668,7 @@ mod tests {
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
         assert_matches!(
-            path.into_write_buffer(false, Some(Path::new("recipes.toml")))
+            path.into_write_buffer(Some(Path::new("recipes.toml")))
                 .unwrap_err(),
             McpError {
                 code: ErrorCode::INVALID_PARAMS,
@@ -819,7 +686,7 @@ mod tests {
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
         assert_matches!(
-            path.into_write_buffer(false, Some(Path::new("sub/recipes.toml")))
+            path.into_write_buffer(Some(Path::new("sub/recipes.toml")))
                 .unwrap_err(),
             McpError {
                 code: ErrorCode::INVALID_PARAMS,
@@ -839,7 +706,7 @@ mod tests {
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
         let write = path
-            .into_write_buffer(false, Some(Path::new("configured/recipes.toml")))
+            .into_write_buffer(Some(Path::new("configured/recipes.toml")))
             .unwrap();
         write.open().unwrap().write_all(b"hello").unwrap();
         assert_eq!(
@@ -858,7 +725,7 @@ mod tests {
         let path = UnresolvedPath::new("recipes.toml")
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
-        let write = path.into_write_buffer(false, None).unwrap();
+        let write = path.into_write_buffer(None).unwrap();
         write
             .open()
             .unwrap()
@@ -887,33 +754,13 @@ mod tests {
     }
 
     #[test]
-    fn into_write_buffer_both_protections_independent() {
-        // A `justfile` stays writable when only recipe-toml protection is
-        // on, and vice versa — the two checks don't leak into each other.
-        let root = TempDir::new().unwrap();
-        let justfile = UnresolvedPath::new("justfile")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        assert!(
-            justfile
-                .into_write_buffer(false, Some(Path::new("recipes.toml")))
-                .is_ok()
-        );
-
-        let recipes_toml = UnresolvedPath::new("recipes.toml")
-            .resolve(root.path(), EMPTY_IGNORE)
-            .unwrap();
-        assert!(recipes_toml.into_write_buffer(true, None).is_ok());
-    }
-
-    #[test]
     fn into_write_buffer_allows_other_files() {
         let root = TempDir::new().unwrap();
         let path = UnresolvedPath::new("notes.md")
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
         let write = path
-            .into_write_buffer(true, Some(Path::new("recipes.toml")))
+            .into_write_buffer(Some(Path::new("recipes.toml")))
             .unwrap();
         write.open().unwrap().write_all(b"hello").unwrap();
         assert_eq!(
@@ -928,7 +775,9 @@ mod tests {
         let path = UnresolvedPath::new("deep/nested/notes.md")
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
-        let write = path.into_write_buffer(true, Some(Path::new("recipes.toml"))).unwrap();
+        let write = path
+            .into_write_buffer(Some(Path::new("recipes.toml")))
+            .unwrap();
         write.open().unwrap().write_all(b"hello").unwrap();
         assert_eq!(
             fs::read_to_string(root.path().join("deep/nested/notes.md")).unwrap(),
@@ -943,7 +792,9 @@ mod tests {
         let path = UnresolvedPath::new("notes.md")
             .resolve(root.path(), EMPTY_IGNORE)
             .unwrap();
-        let write = path.into_write_buffer(true, Some(Path::new("recipes.toml"))).unwrap();
+        let write = path
+            .into_write_buffer(Some(Path::new("recipes.toml")))
+            .unwrap();
         write.open().unwrap().write_all(b"new").unwrap();
         assert_eq!(
             fs::read_to_string(root.path().join("notes.md")).unwrap(),

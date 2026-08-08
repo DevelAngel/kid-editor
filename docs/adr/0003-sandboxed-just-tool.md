@@ -1,9 +1,23 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0004
 date: 2026-08-03
 ---
 
 # A Command Runner That Can't Redraw Its Own Cage
+
+> Superseded by [ADR 0004](0004-internal-recipe-interpreter.md) and
+> [ADR 0005](0005-per-recipe-mcp-tools.md): the `just_run` tool this
+> decision protects has been removed. `recipe_run`'s internal
+> interpreter and per-recipe tools now cover the same need, without an
+> external `just` dependency. The threat model and write-protection
+> reasoning described here were carried forward into ADR 0004 rather
+> than lost — see that ADR's "Context and Problem Statement" — so this
+> document is kept for history, not as a currently-enforced boundary.
+> The workspace's own `justfile` still exists on disk but is no longer
+> referenced by anything in this repository (`prek.toml`'s `cargo-test`
+> hook now runs `cargo test` directly) or specially recognized, hidden,
+> or write-refused by this MCP server.
 
 ## Context and Problem Statement
 
