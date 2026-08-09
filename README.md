@@ -42,7 +42,6 @@ look around, read closely, change precisely.
 
 Five tools. Not fifty.
 That's not an accident — it's the whole design philosophy, stated as a list.
-The `fs_` prefix says what they have in common: every one of them touches the filesystem, nothing else — a separate `recipe_<name>` tool per configured recipe (see ADR 0004/0005) carries its own prefix instead, so a client can tell "runs a command" apart from "touches a file" at a glance.
 
 ## Why it matters
 
