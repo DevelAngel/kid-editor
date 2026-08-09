@@ -98,6 +98,10 @@ run = ["git", "rebase", "--abort"]
 description = "Push the current branch to origin, setting upstream if needed"
 run = ["git", "push", "--set-upstream", "origin", "HEAD"]
 
+[recipe.git-push-force]
+description = "Force-push the current branch, overwriting remote history"
+run = ["git", "push", "--force-with-lease", "origin", "HEAD"]
+
 [recipe.gh-pr-create]
 description = "Open a pull request for the current branch"
 run = ["gh", "pr", "create", "--title", "{title}", "--body", "{body}", "--base", "main"]
