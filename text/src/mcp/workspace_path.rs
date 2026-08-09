@@ -243,6 +243,13 @@ impl WorkspacePath {
         }
     }
 
+    pub(super) fn child(&self, name: &std::ffi::OsStr) -> Self {
+        Self {
+            relative: self.relative.join(name),
+            absolute: self.absolute.join(name),
+        }
+    }
+
     pub(super) fn absolute(&self) -> &Path {
         &self.absolute
     }
