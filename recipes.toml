@@ -68,6 +68,10 @@ run = ["git", "restore", "--staged", "{path}"]
 [recipe.git-restore.args.path]
 help = "file or directory to unstage"
 
+[recipe.git-reset-soft]
+description = "Undo the last commit, keeping its changes staged"
+run = ["git", "reset", "--soft", "HEAD~1"]
+
 [recipe.git-commit]
 description = "Save all staged changes as a new commit, authored by DevelAngel"
 run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de>", "--message", "{message}"]
