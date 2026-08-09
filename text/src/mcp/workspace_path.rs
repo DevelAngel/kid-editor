@@ -243,10 +243,10 @@ impl WorkspacePath {
         }
     }
 
-    pub(super) fn child(&self, name: &std::ffi::OsStr) -> Self {
+    pub(super) fn child<S: AsRef<std::ffi::OsStr> + ?Sized>(&self, name: &S) -> Self {
         Self {
-            relative: self.relative.join(name),
-            absolute: self.absolute.join(name),
+            relative: self.relative.join(name.as_ref()),
+            absolute: self.absolute.join(name.as_ref()),
         }
     }
 
