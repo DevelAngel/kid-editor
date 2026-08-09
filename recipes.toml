@@ -113,7 +113,7 @@ help = "PR number"
 
 [recipe.gh-pr-review-comments]
 description = "List inline review comments on a PR"
-run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments"]
+run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments", "--jq", "[.[] | {id, path, line, author: .user.login, body}]"]
 
 [recipe.gh-pr-review-comments.args.number]
 help = "PR number"
