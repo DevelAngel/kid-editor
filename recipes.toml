@@ -91,8 +91,8 @@ description = "Cancel an in-progress rebase and return to the previous state"
 run = ["git", "rebase", "--abort"]
 
 [recipe.git-push]
-description = "Push the current branch to origin"
-run = ["git", "push", "origin", "HEAD"]
+description = "Push the current branch to origin, setting upstream if needed"
+run = ["git", "push", "--set-upstream", "origin", "HEAD"]
 
 [recipe.gh-pr-create]
 description = "Open a pull request for the current branch"
