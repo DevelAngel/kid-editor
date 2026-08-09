@@ -54,9 +54,16 @@ run = ["git", "add", "{path}"]
 [recipe.git-add.args.path]
 help = "file or directory to stage"
 
+[recipe.git-restore]
+description = "Unstage a file, keeping its working-tree changes"
+run = ["git", "restore", "--staged", "{path}"]
+
+[recipe.git-restore.args.path]
+help = "file or directory to unstage"
+
 [recipe.git-commit]
-description = "Save all staged changes as a new commit"
-run = ["git", "commit", "--message", "{message}"]
+description = "Save all staged changes as a new commit, authored by DevelAngel"
+run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de>", "--message", "{message}"]
 
 [recipe.git-commit.args.message]
 help = "commit message"
@@ -75,3 +82,41 @@ run = ["git", "rebase", "--continue"]
 [recipe.git-rebase-abort]
 description = "Cancel an in-progress rebase and return to the previous state"
 run = ["git", "rebase", "--abort"]
+
+[recipe.git-push]
+description = "Push the current branch to origin"
+run = ["git", "push", "origin", "HEAD"]
+
+[recipe.gh-pr-create]
+description = "Open a pull request for the current branch"
+run = ["gh", "pr", "create", "--title", "{title}", "--body", "{body}", "--base", "main"]
+
+[recipe.gh-pr-create.args.title]
+help = "PR title"
+
+[recipe.gh-pr-create.args.body]
+help = "PR description"
+
+[recipe.gh-pr-view]
+description = "Show PR metadata and issue-level comments"
+run = ["gh", "pr", "view", "{number}", "--json", "title,body,comments,reviews"]
+
+[recipe.gh-pr-view.args.number]
+help = "PR number"
+
+[recipe.gh-pr-review-comments]
+description = "List inline review comments on a PR"
+run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments"]
+
+[recipe.gh-pr-review-comments.args.number]
+help = "PR number"
+
+[recipe.gh-pr-comment]
+description = "Post an issue-level reply on a PR"
+run = ["gh", "pr", "comment", "{number}", "--body", "{body}"]
+
+[recipe.gh-pr-comment.args.number]
+help = "PR number"
+
+[recipe.gh-pr-comment.args.body]
+help = "reply text"
