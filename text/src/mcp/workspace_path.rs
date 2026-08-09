@@ -9,6 +9,7 @@ use rmcp::model::ErrorData as McpError;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
+use std::ffi::OsStr;
 use std::fmt::{self, Display, Formatter};
 use std::fs::{self, File, Metadata, OpenOptions, ReadDir};
 use std::io;
@@ -243,7 +244,7 @@ impl WorkspacePath {
         }
     }
 
-    pub(super) fn child<S: AsRef<std::ffi::OsStr> + ?Sized>(&self, name: &S) -> Self {
+    pub(super) fn child<S: AsRef<OsStr> + ?Sized>(&self, name: &S) -> Self {
         Self {
             relative: self.relative.join(name.as_ref()),
             absolute: self.absolute.join(name.as_ref()),
