@@ -47,6 +47,13 @@ run = ["git", "diff"]
 description = "Show recent commit history"
 run = ["git", "log", "--no-color", "--graph", "--pretty=format:%h • %s (%(decorate:prefix=,suffix= • )%cr)"]
 
+[recipe.git-branch]
+description = "Create and switch to a new branch"
+run = ["git", "switch", "-c", "{name}"]
+
+[recipe.git-branch.args.name]
+help = "name of the new branch"
+
 [recipe.git-add]
 description = "Stage a file's changes so the next commit includes them"
 run = ["git", "add", "{path}"]
