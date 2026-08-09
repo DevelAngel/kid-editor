@@ -74,6 +74,8 @@ run = ["git", "reset", "--soft", "HEAD~1"]
 
 [recipe.git-commit]
 description = "Save all staged changes as a new commit, authored by DevelAngel"
+# TODO: adapt the hardcoded --author identity below when reusing this
+# recipes.toml for a different project or committer.
 run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de>", "--message", "{message}"]
 
 [recipe.git-commit.args.message]
@@ -134,6 +136,8 @@ help = "PR number"
 
 [recipe.gh-pr-review-comments]
 description = "List inline review comments on a PR"
+# TODO: adapt the hardcoded repos/DevelAngel/kid-editor path below when
+# reusing this recipes.toml for a different repository.
 run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments", "--jq", "[.[] | {id, path, line, author: .user.login, body}]"]
 
 [recipe.gh-pr-review-comments.args.number]
