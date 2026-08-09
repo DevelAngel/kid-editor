@@ -22,3 +22,6 @@ target
 
 # MCP Clients Configuration
 /mcp-clients.toml
+
+# Semantic search index cache
+/.kid/
