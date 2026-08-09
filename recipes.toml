@@ -104,6 +104,19 @@ help = "PR title"
 [recipe.gh-pr-create.args.body]
 help = "PR description"
 
+[recipe.gh-pr-edit]
+description = "Update an existing pull request's title and/or description"
+run = ["gh", "pr", "edit", "{number}", "--title", "{title}", "--body", "{body}"]
+
+[recipe.gh-pr-edit.args.number]
+help = "PR number"
+
+[recipe.gh-pr-edit.args.title]
+help = "new PR title"
+
+[recipe.gh-pr-edit.args.body]
+help = "new PR description"
+
 [recipe.gh-pr-view]
 description = "Show PR metadata and issue-level comments"
 run = ["gh", "pr", "view", "{number}", "--json", "title,body,comments,reviews"]
