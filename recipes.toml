@@ -61,6 +61,10 @@ run = ["git", "switch", "{name}"]
 [recipe.git-switch.args.name]
 help = "name of the branch to switch to"
 
+[recipe.git-pull]
+description = "Fetch and integrate changes from the remote for the current branch"
+run = ["git", "pull"]
+
 [recipe.git-add]
 description = "Stage a file's changes so the next commit includes them"
 run = ["git", "add", "{path}"]
