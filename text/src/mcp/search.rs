@@ -17,29 +17,36 @@ use std::fmt::{self, Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Deserialize, JsonSchema, PartialEq)]
+#[derive(Debug, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum SearchMode {
     /// Literal substring match
-    #[default]
-    Exact,
-    /// Approximate, typo-tolerant match ranked by relevance
+    Exact {
+        /// Case-insensitive match (default: false)
+        #[serde(default)]
+        case_insensitive: bool,
+    },
+    /// Approximate, typo-tolerant match ranked by relevance — already
+    /// matches case-insensitively unless the query itself contains an
+    /// uppercase letter
     Fuzzy,
+}
+
+impl Default for SearchMode {
+    fn default() -> Self {
+        Self::Exact {
+            case_insensitive: false,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct SearchInput {
-    /// Text to search for — a literal substring in "exact" mode, an
-    /// approximate pattern in "fuzzy" mode
+    /// Text to search for
     query: String,
     /// File or directory to search in, relative or absolute (default: workspace root)
     #[serde(default)]
     path: Option<UnresolvedPath>,
-    /// Case-insensitive match — "exact" mode only, ignored in "fuzzy" mode
-    /// which already matches case-insensitively unless the query itself
-    /// contains an uppercase letter (default: false)
-    #[serde(default)]
-    case_insensitive: bool,
     /// Search mode (default: exact)
     #[serde(default)]
     mode: SearchMode,
@@ -48,7 +55,7 @@ struct SearchInput {
 #[tool_router(router = search_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Search file contents for text — \"exact\" mode is a literal substring match like `grep -F`, \"fuzzy\" mode tolerates typos and ranks results by relevance. Faster and more precise than reading files to look for text."
+        description = "Search file contents for text. Faster and more precise than reading files to look for text."
     )]
     fn fs_search(
         &self,
@@ -61,8 +68,8 @@ impl McpService {
             .unwrap_or_else(|| WorkspacePath::root(&self.workspace_root));
 
         let matches = match input.mode {
-            SearchMode::Exact => {
-                let search = WorkspaceSearch::new(&input.query, input.case_insensitive)?;
+            SearchMode::Exact { case_insensitive } => {
+                let search = WorkspaceSearch::new(&input.query, case_insensitive)?;
                 search.run(&root, &self.ignore)?
             }
             SearchMode::Fuzzy => {
@@ -95,7 +102,7 @@ struct SearchMatch {
 
 impl Display for SearchMatch {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}:{}", self.file.display(), self.line, self.text)
+        write!(f, "{}:{}: {}", self.file.display(), self.line, self.text)
     }
 }
 
@@ -320,20 +327,14 @@ mod tests {
     }
 
     fn search_text(svc: &McpService, query: &str, case_insensitive: bool) -> String {
-        search_text_mode(svc, query, case_insensitive, SearchMode::Exact)
+        search_text_mode(svc, query, SearchMode::Exact { case_insensitive })
     }
 
-    fn search_text_mode(
-        svc: &McpService,
-        query: &str,
-        case_insensitive: bool,
-        mode: SearchMode,
-    ) -> String {
+    fn search_text_mode(svc: &McpService, query: &str, mode: SearchMode) -> String {
         let result = svc
             .fs_search(Parameters(SearchInput {
                 query: query.to_owned(),
                 path: None,
-                case_insensitive,
                 mode,
             }))
             .unwrap();
@@ -348,7 +349,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("f.txt"), "hello world\n").unwrap();
         let svc = service_with(&dir, &[]);
-        assert_eq!(search_text(&svc, "world", false), "f.txt:1:hello world");
+        assert_eq!(search_text(&svc, "world", false), "f.txt:1: hello world");
     }
 
     #[test]
@@ -360,7 +361,7 @@ mod tests {
         let svc = service_with(&dir, &[]);
         assert_eq!(
             search_text(&svc, "needle", false),
-            "a.txt:1:needle here\nsub/b.txt:1:needle there"
+            "a.txt:1: needle here\nsub/b.txt:1: needle there"
         );
     }
 
@@ -370,7 +371,7 @@ mod tests {
         fs::write(dir.path().join("f.txt"), "Hello\n").unwrap();
         let svc = service_with(&dir, &[]);
         assert_eq!(search_text(&svc, "hello", false), "no matches found");
-        assert_eq!(search_text(&svc, "hello", true), "f.txt:1:Hello");
+        assert_eq!(search_text(&svc, "hello", true), "f.txt:1: Hello");
     }
 
     #[test]
@@ -380,7 +381,7 @@ mod tests {
         fs::write(dir.path().join("target/out.txt"), "needle\n").unwrap();
         fs::write(dir.path().join("keep.txt"), "needle\n").unwrap();
         let svc = service_with(&dir, &["target"]);
-        assert_eq!(search_text(&svc, "needle", false), "keep.txt:1:needle");
+        assert_eq!(search_text(&svc, "needle", false), "keep.txt:1: needle");
     }
 
     #[test]
@@ -397,8 +398,8 @@ mod tests {
         fs::write(dir.path().join("f.txt"), "workspace_root\n").unwrap();
         let svc = service_with(&dir, &[]);
         assert_eq!(
-            search_text_mode(&svc, "wsroot", false, SearchMode::Fuzzy),
-            "f.txt:1:workspace_root"
+            search_text_mode(&svc, "wsroot", SearchMode::Fuzzy),
+            "f.txt:1: workspace_root"
         );
     }
 
@@ -412,8 +413,8 @@ mod tests {
         .unwrap();
         let svc = service_with(&dir, &[]);
         assert_eq!(
-            search_text_mode(&svc, "search", false, SearchMode::Fuzzy),
-            "f.txt:1:search\nf.txt:2:researching everything else"
+            search_text_mode(&svc, "search", SearchMode::Fuzzy),
+            "f.txt:1: search\nf.txt:2: researching everything else"
         );
     }
 
@@ -425,8 +426,8 @@ mod tests {
         fs::write(dir.path().join("keep.txt"), "needle\n").unwrap();
         let svc = service_with(&dir, &["target"]);
         assert_eq!(
-            search_text_mode(&svc, "needle", false, SearchMode::Fuzzy),
-            "keep.txt:1:needle"
+            search_text_mode(&svc, "needle", SearchMode::Fuzzy),
+            "keep.txt:1: needle"
         );
     }
 
@@ -436,7 +437,7 @@ mod tests {
         fs::write(dir.path().join("f.txt"), "hello\n").unwrap();
         let svc = service_with(&dir, &[]);
         assert_eq!(
-            search_text_mode(&svc, "zzz", false, SearchMode::Fuzzy),
+            search_text_mode(&svc, "zzz", SearchMode::Fuzzy),
             "no matches found"
         );
     }
