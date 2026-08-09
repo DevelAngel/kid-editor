@@ -54,6 +54,13 @@ run = ["git", "switch", "-c", "{name}"]
 [recipe.git-branch.args.name]
 help = "name of the new branch"
 
+[recipe.git-switch]
+description = "Switch to an existing branch"
+run = ["git", "switch", "{name}"]
+
+[recipe.git-switch.args.name]
+help = "name of the branch to switch to"
+
 [recipe.git-add]
 description = "Stage a file's changes so the next commit includes them"
 run = ["git", "add", "{path}"]
