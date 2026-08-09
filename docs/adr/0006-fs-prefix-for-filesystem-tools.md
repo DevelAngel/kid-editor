@@ -73,12 +73,3 @@ Described above, under Decision Outcome.
 - Bad, because breaking every fixed tool's name is a larger surface
   than renaming nothing, or than renaming only the newer, less-used
   recipe tools would have been.
-
-## More Information
-
-This decision changes `text/src/mcp/view.rs`, `create.rs`, `insert.rs`,
-`str_replace.rs`, and `tree.rs` (the `#[tool]` function name in each),
-plus their own unit tests, `README.md`, and the cross-reference note in
-ADR 0005. It does not change `recipe_run.rs`, ADR 0004, or ADR 0005's
-own decision — only the collision example they cite (fixed tool names
-they cite as illustration are renamed, the reasoning is not).
