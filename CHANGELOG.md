@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.7.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.6.0..v0.7.0) - 2026-08-10
+
+### Bug Fixes
+
+- **(recipes)** set upstream on git-push - ([5cfd925](https://github.com/DevelAngel/matrix-mcp/commit/5cfd925f8488323a7d3b834b02b8c28d899d7065)) - Angelos Drossos
+
+### Documentation
+
+- **(adr)** drop unneeded ADR 0006 and README notes - ([4b4b3f5](https://github.com/DevelAngel/matrix-mcp/commit/4b4b3f521e623af747dd3cd22b611254eb99fb0d)) - Angelos Drossos
+- **(recipes)** add TODOs for hardcoded identity/repo values - ([c6f47f0](https://github.com/DevelAngel/matrix-mcp/commit/c6f47f081f08b14f2f9d1eada1bb4cbee27dc305)) - Angelos Drossos
+
+### Features
+
+- **(search)** add exact/case-insensitive search via grep-matcher - ([bba72e3](https://github.com/DevelAngel/matrix-mcp/commit/bba72e3a5540181781922cfed2b37bcec0358940)) - Angelos Drossos
+- **(search)** add fuzzy search via nucleo - ([26c0e9c](https://github.com/DevelAngel/matrix-mcp/commit/26c0e9c649be8a3e8eedf16efe10708c019b9f84)) - Angelos Drossos
+
+### Miscellaneous Chores
+
+- **(recipes)** add git-restore recipe - ([edc0015](https://github.com/DevelAngel/matrix-mcp/commit/edc00158e5dca502775d21112bcf9d12a091dff6)) - Angelos Drossos
+- **(recipes)** add git-branch recipe - ([eda7bfe](https://github.com/DevelAngel/matrix-mcp/commit/eda7bfe4bb6fa9861b2f32555869d97246c40bce)) - Angelos Drossos
+- **(recipes)** filter review-comment payload via jq - ([6a160a1](https://github.com/DevelAngel/matrix-mcp/commit/6a160a1874cbebc32a5de2c89dbc07e2f6185a26)) - Angelos Drossos
+- **(recipes)** add gh-pr-edit recipe - ([db91e68](https://github.com/DevelAngel/matrix-mcp/commit/db91e68a16c37650609ea4df60d79c6dca5e2f41)) - Angelos Drossos
+- **(recipes)** add git-reset-soft recipe - ([bc11bfc](https://github.com/DevelAngel/matrix-mcp/commit/bc11bfc7e06a7b463559144e1b3ccf484741ea1f)) - Angelos Drossos
+- **(recipes)** add git-push-force recipe - ([f5bf94b](https://github.com/DevelAngel/matrix-mcp/commit/f5bf94b8e1b4da6eee076f3096a477a65464a0d4)) - Angelos Drossos
+- **(recipes)** add git-switch recipe - ([5a16fb6](https://github.com/DevelAngel/matrix-mcp/commit/5a16fb6e793957328ab779f4551f0fcf9c2e0584)) - Angelos Drossos
+- **(recipes)** add git-pull recipe - ([f03420e](https://github.com/DevelAngel/matrix-mcp/commit/f03420e1f544bf1f6e767d0d17a1eb7862f52339)) - Angelos Drossos
+- **(recipes)** add git-mv recipe - ([99a5044](https://github.com/DevelAngel/matrix-mcp/commit/99a5044db8372c2387f26c029d36e824c13f61ba)) - Angelos Drossos
+- **(recipes)** add git-rm recipe - ([4f3c84c](https://github.com/DevelAngel/matrix-mcp/commit/4f3c84c0afba05809b4f33a8066f16f0e1142f4d)) - Angelos Drossos
+- ignore semantic search index cache dir - ([63fa85a](https://github.com/DevelAngel/matrix-mcp/commit/63fa85afd5fc2159635c3ce6a98965be9f42d644)) - Angelos Drossos
+
+### Refactoring
+
+- **(mcp)** [**breaking**] prefix filesystem tools with fs_ - ([63131c0](https://github.com/DevelAngel/matrix-mcp/commit/63131c0f2a1110cbb342b3e25ee8041f70a22bf4)) - Angelos Drossos
+- **(search)** apply review feedback - ([39c4de3](https://github.com/DevelAngel/matrix-mcp/commit/39c4de30ba5b910983af64e388fffa6647413935)) - Angelos Drossos
+- **(search)** split into exact/fuzzy submodules - ([69bd0e5](https://github.com/DevelAngel/matrix-mcp/commit/69bd0e5a604684d3af5f3154afe75654c5b6a9a8)) - Angelos Drossos
+- **(search)** thread WorkspacePath through the walk - ([791e2f1](https://github.com/DevelAngel/matrix-mcp/commit/791e2f119227a1444749d6fffdbcbbd8b1b402c7)) - Angelos Drossos
+- **(workspace-path)** generalize child over AsRef<OsStr> - ([62aed2a](https://github.com/DevelAngel/matrix-mcp/commit/62aed2aae26873af88021a8c0c2aa58a589ad0e6)) - Angelos Drossos
+
+### Style
+
+- **(workspace-path)** hoist OsStr into the use block - ([33a7d60](https://github.com/DevelAngel/matrix-mcp/commit/33a7d602ab6edd0427c56bc7face044ee511791c)) - Angelos Drossos
+
 ## [0.6.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.5.0..v0.6.0) - 2026-08-08
 
 ### Miscellaneous Chores
