@@ -72,6 +72,16 @@ run = ["git", "add", "{path}"]
 [recipe.git-add.args.path]
 help = "file or directory to stage"
 
+[recipe.git-mv]
+description = "Rename or move a tracked file, staging the change"
+run = ["git", "mv", "{source}", "{destination}"]
+
+[recipe.git-mv.args.source]
+help = "current path of the tracked file"
+
+[recipe.git-mv.args.destination]
+help = "new path for the file"
+
 [recipe.git-restore]
 description = "Unstage a file, keeping its working-tree changes"
 run = ["git", "restore", "--staged", "{path}"]
