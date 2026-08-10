@@ -1,5 +1,6 @@
 mod exact;
 mod fuzzy;
+mod semantic;
 
 use super::McpService;
 use super::workspace_path::{UnresolvedPath, WorkspacePath};
