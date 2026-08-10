@@ -82,6 +82,13 @@ help = "current path of the tracked file"
 [recipe.git-mv.args.destination]
 help = "new path for the file"
 
+[recipe.git-rm]
+description = "Remove a tracked file, staging the deletion"
+run = ["git", "rm", "{path}"]
+
+[recipe.git-rm.args.path]
+help = "file or directory to remove"
+
 [recipe.git-restore]
 description = "Unstage a file, keeping its working-tree changes"
 run = ["git", "restore", "--staged", "{path}"]
