@@ -1,7 +1,8 @@
 //! Decouples semantic search ranking from the embedding backend, so
 //! that logic can be unit-tested without a model download or network
 //! access.
-#![allow(dead_code)] // wired into SearchMode::Semantic in a later commit
+
+mod minilm;
 
 use std::cmp::Ordering;
 use std::fs;
@@ -14,6 +15,8 @@ use sha2::{Digest, Sha256};
 use super::SearchMatch;
 use crate::mcp::workspace_path::{IgnorePattern, WorkspacePath, not_found_or_io};
 use rmcp::model::ErrorData as McpError;
+
+pub(super) use minilm::MiniLmEmbedder;
 
 /// Turns a line of text into a dense vector for similarity ranking.
 /// Implementations must be deterministic: the same input always

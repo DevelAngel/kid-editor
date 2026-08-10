@@ -7,7 +7,7 @@ use super::workspace_path::{UnresolvedPath, WorkspacePath};
 use exact::WorkspaceSearch;
 use fuzzy::FuzzySearch;
 
-use anyhow::Result;
+use anyhow::Result as AnyResult;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError};
 use rmcp::schemars::{self, JsonSchema};
@@ -16,6 +16,13 @@ use serde::Deserialize;
 
 use std::fmt::{self, Display, Formatter};
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// Process-wide, not per-workspace: the model is the same regardless
+/// of which workspace is being searched, and loading it is expensive
+/// enough (network fetch on a cold `hf-hub` cache) that every
+/// `SearchMode::Semantic` call should share one instance.
+static SEMANTIC_EMBEDDER: OnceLock<AnyResult<semantic::MiniLmEmbedder>> = OnceLock::new();
 
 #[derive(Debug, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +37,10 @@ enum SearchMode {
     /// matches case-insensitively unless the query itself contains an
     /// uppercase letter
     Fuzzy,
+    /// Meaning-based match ranked by cosine similarity of a local
+    /// embedding model. First call may be slower while the model
+    /// cache and the workspace's semantic index warm up.
+    Semantic,
 }
 
 impl Default for SearchMode {
@@ -75,6 +86,19 @@ impl McpService {
             SearchMode::Fuzzy => {
                 let mut search = FuzzySearch::new(&input.query);
                 search.run(&root, &self.ignore)?
+            }
+            SearchMode::Semantic => {
+                let embedder = SEMANTIC_EMBEDDER.get_or_init(semantic::MiniLmEmbedder::load);
+                let embedder = embedder.as_ref().map_err(|err| {
+                    McpError::internal_error(format!("semantic search unavailable: {err}"), None)
+                })?;
+                let workspace = WorkspacePath::root(&self.workspace_root);
+                semantic::SemanticSearch::new(embedder).run(
+                    &input.query,
+                    &root,
+                    &workspace,
+                    &self.ignore,
+                )?
             }
         };
 
