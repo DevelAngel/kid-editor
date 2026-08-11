@@ -1144,28 +1144,23 @@ name = "kid-text-editor"
 version = "0.7.0"
 dependencies = [
  "anyhow",
- "askama",
  "assert_fs",
  "axum",
- "base64 0.23.0",
- "chrono",
  "clap",
  "clap-verbosity-flag",
- "derive_more",
  "glob",
  "grep-regex",
  "grep-searcher",
  "indexmap",
  "indoc",
  "nucleo-matcher",
+ "oauth",
  "recipe",
  "regex",
  "rmcp",
  "secrecy",
  "serde",
  "serde_json",
- "serde_urlencoded",
- "sha2 0.11.0",
  "tokio",
  "tokio-util",
  "toml",
@@ -1174,7 +1169,6 @@ dependencies = [
  "tracing-subscriber",
  "type-state-builder",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -1280,6 +1274,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "oauth"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "askama",
+ "axum",
+ "base64 0.23.0",
+ "chrono",
+ "derive_more",
+ "rmcp",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2 0.11.0",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "url",
+ "uuid",
 ]
 
 [[package]]

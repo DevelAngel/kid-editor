@@ -1,10 +1,11 @@
 mod cli;
 mod mcp;
-mod oauth;
 mod server;
 
+use crate::cli::Cli;
 use crate::server::McpServer;
-use crate::{cli::Cli, oauth::McpClientsConfig};
+
+use oauth::McpClientsConfig;
 
 use anyhow::{Context, Result};
 use clap::Parser;
