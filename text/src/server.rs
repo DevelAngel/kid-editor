@@ -1,6 +1,6 @@
 use crate::mcp::{IgnorePattern, McpService, discover_recipes};
-use crate::oauth::{self, McpClientsConfig, McpOAuthStore};
 
+use oauth::{self, McpClientsConfig, McpOAuthStore};
 use recipe::RecipeFile;
 
 use anyhow::Result;

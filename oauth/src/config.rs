@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn example_file_parses() {
-        let raw = include_str!("../../../mcp-clients.example.toml");
+        let raw = include_str!("../../mcp-clients.example.toml");
         let config: McpClientsConfig = toml::from_str(raw).unwrap();
         assert_eq!(config.clients.len(), 3);
         assert_eq!(config.clients[0].client_id, "mcp-inspector");

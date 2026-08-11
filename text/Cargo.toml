@@ -38,15 +38,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 url = { workspace = true, features = ["serde"] }
 type-state-builder.workspace = true
-askama = "0.16.0"
-base64 = "0.23.0"
-chrono = "0.4.45"
-sha2 = { version = "0.11.0", features = ["zeroize"] }
-uuid = { version = "1.24.0", features = ["atomic", "serde", "v4", "v7", "zerocopy"] }
-derive_more = { version = "2.1.1", features = ["deref", "display", "from", "from_str"] }
-serde_urlencoded = "0.7.1"
 toml.workspace = true
 recipe = { path = "../recipe" }
+oauth = { path = "../oauth" }
 
 [dev-dependencies]
 assert_fs.workspace = true
