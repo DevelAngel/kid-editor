@@ -1,19 +1,9 @@
-#[cfg(feature = "client")]
-mod client;
 #[cfg(feature = "server")]
-mod config;
+mod server;
 #[cfg(feature = "server")]
-mod handlers;
-#[cfg(feature = "server")]
-mod store;
+pub use server::*;
 
 #[cfg(feature = "client")]
+mod client;
+#[cfg(feature = "client")]
 pub use client::authenticated_client;
-#[cfg(feature = "server")]
-pub use config::McpClientsConfig;
-#[cfg(feature = "server")]
-pub use handlers::{
-    approve, auth_server, authorize, gen_access_token, protected_resource, validate_access_token,
-};
-#[cfg(feature = "server")]
-pub use store::McpOAuthStore;

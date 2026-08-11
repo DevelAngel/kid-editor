@@ -27,11 +27,11 @@ tracing.workspace = true
 url = { workspace = true, features = ["serde"] }
 toml.workspace = true
 axum = { workspace = true, optional = true }
-askama = { version = "0.16.0", optional = true }
-base64 = { version = "0.23.0", optional = true }
-chrono = { version = "0.4.45", optional = true }
-sha2 = { version = "0.11.0", features = ["zeroize"], optional = true }
-uuid = { version = "1.24.0", features = ["atomic", "serde", "v4", "v7", "zerocopy"], optional = true }
-derive_more = { version = "2.1.1", features = ["deref", "display", "from", "from_str"], optional = true }
-serde_urlencoded = { version = "0.7.1", optional = true }
+askama = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+sha2 = { workspace = true, features = ["zeroize"], optional = true }
+uuid = { workspace = true, features = ["atomic", "serde", "v4", "v7", "zerocopy"], optional = true }
+derive_more = { workspace = true, features = ["deref", "display", "from", "from_str"], optional = true }
+serde_urlencoded = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
