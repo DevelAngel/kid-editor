@@ -10,9 +10,12 @@ readme.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+server = ["dep:anyhow", "dep:axum", "dep:askama", "dep:base64", "dep:chrono", "dep:sha2", "dep:uuid", "dep:derive_more", "dep:serde_urlencoded", "rmcp/server"]
+client = ["dep:reqwest", "rmcp/client"]
+
 [dependencies]
-anyhow.workspace = true
-axum.workspace = true
 rmcp = { workspace = true, features = ["auth"] }
 secrecy = { workspace = true, features = ["serde"] }
 serde.workspace = true
@@ -22,10 +25,13 @@ tokio-util.workspace = true
 tracing.workspace = true
 url = { workspace = true, features = ["serde"] }
 toml.workspace = true
-askama = "0.16.0"
-base64 = "0.23.0"
-chrono = "0.4.45"
-sha2 = { version = "0.11.0", features = ["zeroize"] }
-uuid = { version = "1.24.0", features = ["atomic", "serde", "v4", "v7", "zerocopy"] }
-derive_more = { version = "2.1.1", features = ["deref", "display", "from", "from_str"] }
-serde_urlencoded = "0.7.1"
+anyhow = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+askama = { version = "0.16.0", optional = true }
+base64 = { version = "0.23.0", optional = true }
+chrono = { version = "0.4.45", optional = true }
+sha2 = { version = "0.11.0", features = ["zeroize"], optional = true }
+uuid = { version = "1.24.0", features = ["atomic", "serde", "v4", "v7", "zerocopy"], optional = true }
+derive_more = { version = "2.1.1", features = ["deref", "display", "from", "from_str"], optional = true }
+serde_urlencoded = { version = "0.7.1", optional = true }
+reqwest = { workspace = true, optional = true }
