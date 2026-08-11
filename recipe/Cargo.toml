@@ -1,5 +1,5 @@
 [package]
-name = "recipe"
+name = "kid-recipe"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +10,9 @@ keywords = ["recipe", "command-runner", "task-runner"]
 
 [lints]
 workspace = true
+
+[lib]
+name = "recipe"
 
 [[bin]]
 name = "recipe"
