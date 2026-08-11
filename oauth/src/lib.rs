@@ -1,3 +1,5 @@
+#[cfg(feature = "client")]
+mod client;
 #[cfg(feature = "server")]
 mod config;
 #[cfg(feature = "server")]
@@ -5,6 +7,8 @@ mod handlers;
 #[cfg(feature = "server")]
 mod store;
 
+#[cfg(feature = "client")]
+pub use client::authenticated_client;
 #[cfg(feature = "server")]
 pub use config::McpClientsConfig;
 #[cfg(feature = "server")]
