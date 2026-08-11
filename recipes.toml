@@ -180,3 +180,13 @@ help = "PR number"
 
 [recipe.gh-pr-comment.args.body]
 help = "reply text"
+
+[recipe.gh-pr-approve]
+description = "Approve a pull request"
+run = ["gh", "pr", "review", "{number}", "--approve", "--body", "{body}"]
+
+[recipe.gh-pr-approve.args.number]
+help = "PR number"
+
+[recipe.gh-pr-approve.args.body]
+help = "approval comment"
