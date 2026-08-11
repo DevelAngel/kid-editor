@@ -12,10 +12,11 @@ workspace = true
 
 [features]
 default = []
-server = ["dep:anyhow", "dep:axum", "dep:askama", "dep:base64", "dep:chrono", "dep:sha2", "dep:uuid", "dep:derive_more", "dep:serde_urlencoded", "rmcp/server"]
+server = ["dep:axum", "dep:askama", "dep:base64", "dep:chrono", "dep:sha2", "dep:uuid", "dep:derive_more", "dep:serde_urlencoded", "rmcp/server"]
 client = ["dep:reqwest", "rmcp/client"]
 
 [dependencies]
+anyhow.workspace = true
 rmcp = { workspace = true, features = ["auth"] }
 secrecy = { workspace = true, features = ["serde"] }
 serde.workspace = true
@@ -25,7 +26,6 @@ tokio-util.workspace = true
 tracing.workspace = true
 url = { workspace = true, features = ["serde"] }
 toml.workspace = true
-anyhow = { workspace = true, optional = true }
 axum = { workspace = true, optional = true }
 askama = { version = "0.16.0", optional = true }
 base64 = { version = "0.23.0", optional = true }
