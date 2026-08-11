@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use reqwest::Client as HttpClient;
 use rmcp::transport::auth::{AuthClient, ClientCredentialsConfig, OAuthState};
 use secrecy::{ExposeSecret, SecretString};
+use url::Url;
 
 /// Builds an [`AuthClient`] authenticated against `mcp_url` via the OAuth
 /// 2.0 Client Credentials grant (SEP-1046).
@@ -14,16 +15,21 @@ use secrecy::{ExposeSecret, SecretString};
 /// the `AuthorizationManager` inside `AuthClient`, so callers don't need to
 /// track expiry themselves.
 pub async fn authenticated_client(
-    mcp_url: &str,
+    mcp_url: &Url,
     client_id: &str,
     client_secret: &SecretString,
 ) -> Result<AuthClient<HttpClient>> {
-    let oauth_http_client = HttpClient::builder()
+    // Built explicitly here (instead of letting `OAuthState::new` build its
+    // own internally) so a broken TLS setup (e.g. no system CA certificates
+    // loaded) surfaces as a concrete "failed to create http client" error
+    // instead of the opaque "Internal error: builder error" that
+    // `OAuthState::new` would otherwise report.
+    let http_client = HttpClient::builder()
         .timeout(Duration::from_secs(60))
         .build()
         .context("failed to create http client for OAuth communication")?;
 
-    let mut state = OAuthState::new(mcp_url, Some(oauth_http_client))
+    let mut state = OAuthState::new(mcp_url.as_str(), Some(http_client.clone()))
         .await
         .with_context(|| format!("failed to initialize OAuth state for {mcp_url}"))?;
     state
@@ -31,7 +37,7 @@ pub async fn authenticated_client(
             client_id: client_id.to_owned(),
             client_secret: client_secret.expose_secret().to_owned(),
             scopes: vec![],
-            resource: Some(mcp_url.to_owned()),
+            resource: Some(mcp_url.to_string()),
         })
         .await
         .with_context(|| format!("OAuth client credentials authentication failed for {mcp_url}"))?;
@@ -43,5 +49,10 @@ pub async fn authenticated_client(
         .into_authorization_manager()
         .context("failed to get OAuth authorization manager")?;
 
-    Ok(AuthClient::new(HttpClient::default(), auth_manager))
+    // Reuse the same (already-configured) http client for actual MCP
+    // traffic instead of building a second, unconfigured one via
+    // `HttpClient::default()` - `reqwest::Client` is cheap to clone
+    // (internally Arc-wrapped), so this keeps timeout/connection-pool
+    // settings consistent between OAuth calls and MCP requests.
+    Ok(AuthClient::new(http_client, auth_manager))
 }
