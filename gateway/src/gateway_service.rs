@@ -1,6 +1,7 @@
-use crate::config::UpstreamConfig;
+use crate::config::{UpstreamConfig, UpstreamName};
 
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use rmcp::ServiceExt;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, ErrorData as McpError, Implementation,
@@ -15,11 +16,15 @@ use rmcp::{RoleClient, RoleServer, ServerHandler};
 
 use std::sync::Arc;
 
-/// One connected upstream MCP server: its live client connection plus the
-/// tool-name prefix (`{name}_`) this gateway exposes its tools under.
+/// One connected upstream MCP server: its live client connection plus its
+/// (already-prefixed) tool list. Keeping tools here, per upstream, instead
+/// of in a separate flat list keeps "which tools exist" and "which
+/// upstream serves them" as a single source of truth - there's no second
+/// collection that could drift out of sync with the routing table.
 struct Upstream {
     prefix: String,
     client: RunningService<RoleClient, ()>,
+    tools: Vec<Tool>,
 }
 
 /// MCP server that aggregates tools from multiple upstream MCP servers
@@ -28,8 +33,7 @@ struct Upstream {
 /// `call_tool` back to the matching upstream by stripping that prefix.
 #[derive(Clone)]
 pub struct GatewayService {
-    upstreams: Arc<Vec<Upstream>>,
-    tools: Arc<Vec<Tool>>,
+    upstreams: Arc<IndexMap<UpstreamName, Upstream>>,
 }
 
 impl ServerHandler for GatewayService {
@@ -51,7 +55,12 @@ impl ServerHandler for GatewayService {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        Ok(ListToolsResult::with_all_items((*self.tools).clone()))
+        let tools = self
+            .upstreams
+            .values()
+            .flat_map(|upstream| upstream.tools.iter().cloned())
+            .collect();
+        Ok(ListToolsResult::with_all_items(tools))
     }
 
     async fn call_tool(
@@ -61,7 +70,7 @@ impl ServerHandler for GatewayService {
     ) -> Result<CallToolResponse, McpError> {
         let (upstream, tool_name) = self
             .upstreams
-            .iter()
+            .values()
             .find_map(|upstream| {
                 request
                     .name
@@ -98,42 +107,40 @@ impl GatewayService {
     /// tool list. An upstream that fails to connect or list its tools
     /// aborts startup entirely - a gateway silently missing an upstream
     /// would be worse than one that fails fast.
-    pub async fn connect(
-        upstream_configs: impl IntoIterator<Item = UpstreamConfig>,
-    ) -> Result<Self> {
-        let mut upstreams = Vec::new();
-        let mut tools = Vec::new();
+    pub async fn connect(upstream_configs: IndexMap<UpstreamName, UpstreamConfig>) -> Result<Self> {
+        let mut upstreams = IndexMap::with_capacity(upstream_configs.len());
 
-        for config in upstream_configs {
+        for (name, config) in upstream_configs {
             let auth_client =
                 oauth::authenticated_client(&config.mcp_url, &config.client_id, &config.secret)
                     .await
-                    .with_context(|| {
-                        format!("failed to authenticate against upstream '{}'", config.name)
-                    })?;
+                    .with_context(|| format!("failed to authenticate against upstream '{name}'"))?;
 
             let client = connect_upstream(auth_client, &config.mcp_url)
                 .await
-                .with_context(|| format!("failed to connect to upstream '{}'", config.name))?;
+                .with_context(|| format!("failed to connect to upstream '{name}'"))?;
 
-            let upstream_tools = client
+            let prefix = format!("{name}_");
+            let tools = client
                 .list_all_tools()
                 .await
-                .with_context(|| format!("failed to list tools from upstream '{}'", config.name))?;
+                .with_context(|| format!("failed to list tools from upstream '{name}'"))?
+                .into_iter()
+                .map(|tool| prefixed(tool, &prefix))
+                .collect();
 
-            let prefix = format!("{}_", config.name);
-            tools.extend(
-                upstream_tools
-                    .into_iter()
-                    .map(|tool| prefixed(tool, &prefix)),
+            upstreams.insert(
+                name,
+                Upstream {
+                    prefix,
+                    client,
+                    tools,
+                },
             );
-
-            upstreams.push(Upstream { prefix, client });
         }
 
         Ok(Self {
             upstreams: Arc::new(upstreams),
-            tools: Arc::new(tools),
         })
     }
 }
