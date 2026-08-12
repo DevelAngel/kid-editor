@@ -1,0 +1,47 @@
+[package]
+name = "kid-mcp-gateway"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+readme.workspace = true
+keywords = ["mcp", "gateway", "aggregator"]
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "kid-mcp-gateway"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+clap-verbosity-flag.workspace = true
+rmcp = { workspace = true, features = [
+  "auth",
+  "server",
+  "client",
+  "schemars",
+  "transport-streamable-http-server",
+  "transport-streamable-http-client-reqwest",
+] }
+secrecy = { workspace = true, features = ["serde"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower-http = { workspace = true, features = ["cors", "trace"] }
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url = { workspace = true, features = ["serde"] }
+type-state-builder.workspace = true
+toml.workspace = true
+oauth = { path = "../oauth", package = "kid-oauth", features = ["server", "client"] }
+reqwest.workspace = true
+
+[dev-dependencies]
+assert_fs.workspace = true
+indoc.workspace = true

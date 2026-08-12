@@ -1,0 +1,20 @@
+# Example gateway configuration.
+#
+# Lists the upstream MCP servers this gateway aggregates tools from.
+# Copy this file, fill in real URLs and secrets, and point the gateway's
+# positional FILE argument at it.
+#
+# `name` becomes the tool-name prefix used to route calls back to that
+# upstream (e.g. `name = "editor"` exposes its tools as `editor_*`).
+
+[[upstream]]
+name = "editor"
+mcp-url = "http://localhost:9300/mcp"
+client-id = "kid-gateway"
+secret = "replace-with-a-generated-secret"
+
+[[upstream]]
+name = "tasks"
+mcp-url = "http://localhost:9301/mcp"
+client-id = "kid-gateway"
+secret = "replace-with-another-generated-secret"

@@ -1326,6 +1326,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "kid-mcp-gateway"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "assert_fs",
+ "axum",
+ "clap",
+ "clap-verbosity-flag",
+ "indoc",
+ "kid-oauth",
+ "reqwest",
+ "rmcp",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tower-http 0.7.0",
+ "tracing",
+ "tracing-subscriber",
+ "type-state-builder",
+ "url",
+]
+
+[[package]]
 name = "kid-oauth"
 version = "0.7.0"
 dependencies = [
