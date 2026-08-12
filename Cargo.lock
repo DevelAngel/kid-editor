@@ -1334,6 +1334,8 @@ dependencies = [
  "axum",
  "clap",
  "clap-verbosity-flag",
+ "derive_more",
+ "indexmap",
  "indoc",
  "kid-oauth",
  "reqwest",

@@ -98,7 +98,10 @@ impl GatewayService {
     /// tool list. An upstream that fails to connect or list its tools
     /// aborts startup entirely - a gateway silently missing an upstream
     /// would be worse than one that fails fast.
-    pub async fn connect(upstream_configs: Vec<UpstreamConfig>) -> Result<Self> {
+    pub async fn connect(
+        upstream_configs: impl IntoIterator<Item = UpstreamConfig>,
+    ) -> Result<Self> {
+        let upstream_configs: Vec<_> = upstream_configs.into_iter().collect();
         let mut upstreams = Vec::with_capacity(upstream_configs.len());
         let mut tools = Vec::new();
 
