@@ -101,8 +101,7 @@ impl GatewayService {
     pub async fn connect(
         upstream_configs: impl IntoIterator<Item = UpstreamConfig>,
     ) -> Result<Self> {
-        let upstream_configs: Vec<_> = upstream_configs.into_iter().collect();
-        let mut upstreams = Vec::with_capacity(upstream_configs.len());
+        let mut upstreams = Vec::new();
         let mut tools = Vec::new();
 
         for config in upstream_configs {
