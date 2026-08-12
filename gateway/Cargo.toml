@@ -20,6 +20,8 @@ anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
 clap-verbosity-flag.workspace = true
+derive_more = { workspace = true, features = ["deref", "display", "from"] }
+indexmap.workspace = true
 rmcp = { workspace = true, features = [
   "auth",
   "server",

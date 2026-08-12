@@ -34,7 +34,8 @@ pub struct GatewayServer {
 
 impl GatewayServer {
     pub async fn serve(self, addr: SocketAddr) -> Result<()> {
-        let gateway_service = GatewayService::connect(self.upstreams.upstreams).await?;
+        let gateway_service =
+            GatewayService::connect(self.upstreams.upstreams.into_values()).await?;
 
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
             .chain(self.allowed_origins)
