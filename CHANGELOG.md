@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.8.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.7.0..v0.8.0) - 2026-08-12
+
+### Bug Fixes
+
+- **(server)** disable legacy MCP session mode - ([f17c3a8](https://github.com/DevelAngel/matrix-mcp/commit/f17c3a8f53fdb31b7211c93b177f7971b6ca8c25)) - Angelos Drossos
+- prefix oauth package name with kid- - ([5e3219a](https://github.com/DevelAngel/matrix-mcp/commit/5e3219ae985bb300b2511a300d4b119b69f2513c)) - Angelos Drossos
+- prefix recipe package name with kid- - ([1494942](https://github.com/DevelAngel/matrix-mcp/commit/14949423b97dcf7b4e1ab0242562d2017cd3f224)) - Angelos Drossos
+- address review feedback on oauth features - ([5464e16](https://github.com/DevelAngel/matrix-mcp/commit/5464e16a921e131b8f9b3afc837752cb54df68f7)) - Angelos Drossos
+
+### Features
+
+- **(gateway)** scaffold kid-mcp-gateway crate - ([28c8a0e](https://github.com/DevelAngel/matrix-mcp/commit/28c8a0eb7237bdaa9c175610005d757b60864782)) - Angelos Drossos
+- **(gateway)** aggregate and route upstream tools - ([accb81e](https://github.com/DevelAngel/matrix-mcp/commit/accb81e31448878b0a68604fc5a816bed47927f0)) - Angelos Drossos
+- **(oauth)** gate server code behind server feature - ([fbe118f](https://github.com/DevelAngel/matrix-mcp/commit/fbe118f992e2d686e8880c45afd439d1031fe62d)) - Angelos Drossos
+- **(oauth)** add client-credentials helper - ([7f2b889](https://github.com/DevelAngel/matrix-mcp/commit/7f2b889c2e4a0a76aa62f43d2bca8f5f1f007680)) - Angelos Drossos
+
+### Miscellaneous Chores
+
+- **(recipes)** add gh-pr-approve recipe - ([f684161](https://github.com/DevelAngel/matrix-mcp/commit/f684161ed6f9fbf85cd08bd9efd0195c37dac144)) - Angelos Drossos
+
+### Refactoring
+
+- **(gateway)** key upstreams by name in an IndexMap - ([c6c1a98](https://github.com/DevelAngel/matrix-mcp/commit/c6c1a980b184b9ee4c8940597895950547fdbe59)) - Angelos Drossos
+- **(gateway)** drop unnecessary Vec collect in connect - ([ed32ca0](https://github.com/DevelAngel/matrix-mcp/commit/ed32ca08d651ba0247e985fa1254c00db5f5c8dd)) - Angelos Drossos
+- **(gateway)** fold tool lists into per-upstream storage - ([ccf46a9](https://github.com/DevelAngel/matrix-mcp/commit/ccf46a96ed0612529339a8561f651e628383cbe3)) - Angelos Drossos
+- extract oauth crate from text - ([1c3dcc5](https://github.com/DevelAngel/matrix-mcp/commit/1c3dcc5c0f92c4d5e5e3375ace1cc6e32f8d0ae1)) - Angelos Drossos
+
 ## [0.7.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.6.0..v0.7.0) - 2026-08-10
 
 ### Bug Fixes
