@@ -140,7 +140,8 @@ impl McpServer {
             StreamableHttpServerConfig::default()
                 .with_allowed_origins(allowed_origins)
                 .with_allowed_hosts(allowed_hosts)
-                .with_cancellation_token(shutdown.child_token()),
+                .with_cancellation_token(shutdown.child_token())
+                .with_legacy_session_mode(false),
         );
 
         let app = if let Some(clients) = self.clients {
