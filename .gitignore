@@ -23,5 +23,8 @@ target
 # MCP Clients Configuration
 /mcp-clients.toml
 
+# Gateway upstreams configuration
+/gateway.toml
+
 # Semantic search index cache
 /.kid/
