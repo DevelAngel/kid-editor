@@ -13,6 +13,7 @@ use rmcp::transport::streamable_http_client::{
     StreamableHttpClientTransport, StreamableHttpClientTransportConfig,
 };
 use rmcp::{RoleClient, RoleServer, ServerHandler};
+use serde_json::Value;
 
 use std::sync::Arc;
 
@@ -68,6 +69,15 @@ impl ServerHandler for GatewayService {
         request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
+        let prefixed_tool_name = request.name.to_string();
+        let path = request
+            .arguments
+            .as_ref()
+            .and_then(|args| args.get("path"))
+            .and_then(Value::as_str)
+            .unwrap_or("-")
+            .to_owned();
+
         let (upstream, tool_name) = self
             .upstreams
             .values()
@@ -81,7 +91,10 @@ impl ServerHandler for GatewayService {
                 McpError::invalid_params(format!("unknown tool: {}", request.name), None)
             })?;
 
-        upstream
+        tracing::info!(tool = %prefixed_tool_name, upstream = %upstream.prefix.trim_end_matches('_'), path = %path, "tool called");
+        tracing::debug!(tool = %prefixed_tool_name, arguments = ?request.arguments, "tool arguments");
+
+        let result = upstream
             .client
             .call_tool({
                 let mut params = CallToolRequestParams::new(tool_name);
@@ -98,8 +111,25 @@ impl ServerHandler for GatewayService {
                     ),
                     None,
                 )
-            })
+            });
+
+        match &result {
+            Ok(response) => {
+                let output = output_text(response);
+                tracing::info!(tool = %prefixed_tool_name, output_chars = output.chars().count(), "tool succeeded");
+                tracing::debug!(tool = %prefixed_tool_name, output = %output, "tool output");
+            }
+            Err(error) => tracing::info!(tool = %prefixed_tool_name, %error, "tool failed"),
+        }
+
+        result
     }
+}
+
+/// Renders an upstream's result for logging — same policy as
+/// `kid-text-editor`'s own tool-call logging.
+fn output_text(response: &CallToolResponse) -> String {
+    format!("{response:?}")
 }
 
 impl GatewayService {

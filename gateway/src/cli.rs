@@ -2,10 +2,29 @@ pub use clap::Parser;
 use clap::ValueHint;
 use clap::{ArgGroup, Args};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 use url::Url;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+
+/// Builds the log filter from `--verbose`/`--quiet`. Everything outside
+/// this crate (`rmcp`, `tower`, ...) is capped at `warn` even when
+/// `verbosity` asks for more, so raised verbosity surfaces this crate's
+/// own tool-routing logs without drowning in dependency chatter — capped
+/// at `verbosity` itself too, so `--quiet` (error level) quiets
+/// dependencies down to `error` as well, not just this crate.
+/// `RUST_LOG`, if set, wins outright.
+pub fn env_filter(verbosity: &Verbosity<InfoLevel>) -> EnvFilter {
+    if let Ok(filter) = EnvFilter::try_from_default_env() {
+        return filter;
+    }
+    let verbosity: LevelFilter = verbosity.tracing_level_filter();
+    let baseline = std::cmp::min(verbosity, LevelFilter::WARN);
+    let crate_name = env!("CARGO_PKG_NAME").replace('-', "_");
+    EnvFilter::new(format!("{baseline},{crate_name}={verbosity}"))
+}
 
 /// MCP gateway aggregating tools from multiple upstream MCP servers
 #[derive(Parser, Debug)]
