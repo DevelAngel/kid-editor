@@ -20,7 +20,16 @@ pub struct InsertInput {
 
 #[tool_router(router = insert_tool_router, vis = "pub(super)")]
 impl McpService {
-    #[tool(description = "Insert text after a given line number (0 = start of file)")]
+    #[tool(
+        description = "Insert text after a given line number (0 = start of file)",
+        annotations(
+            title = "Insert Text",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
     fn fs_insert(
         &self,
         Parameters(input): Parameters<InsertInput>,

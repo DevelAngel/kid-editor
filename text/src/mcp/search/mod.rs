@@ -54,7 +54,14 @@ struct SearchInput {
 #[tool_router(router = search_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Search file contents for text. Faster and more precise than reading files to look for text."
+        description = "Search file contents for text. Faster and more precise than reading files to look for text.",
+        annotations(
+            title = "Search Files",
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
     fn fs_search(
         &self,

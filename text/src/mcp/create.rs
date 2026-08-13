@@ -20,7 +20,14 @@ struct CreateInput {
 #[tool_router(router = create_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Create a file with the given content, overwriting it if it already exists"
+        description = "Create a file with the given content, overwriting it if it already exists",
+        annotations(
+            title = "Create File",
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
     fn fs_create(
         &self,
