@@ -94,7 +94,7 @@ impl ServerHandler for GatewayService {
         tracing::info!(tool = %prefixed_tool_name, upstream = %upstream.prefix.trim_end_matches('_'), path = %path, "tool called");
         tracing::debug!(tool = %prefixed_tool_name, arguments = ?request.arguments, "tool arguments");
 
-        let result = upstream
+        let result: Result<CallToolResponse, McpError> = upstream
             .client
             .call_tool({
                 let mut params = CallToolRequestParams::new(tool_name);
@@ -115,7 +115,7 @@ impl ServerHandler for GatewayService {
 
         match &result {
             Ok(response) => {
-                let output = output_text(response);
+                let output = response.output_text();
                 tracing::info!(tool = %prefixed_tool_name, output_chars = output.chars().count(), "tool succeeded");
                 tracing::debug!(tool = %prefixed_tool_name, output = %output, "tool output");
             }
@@ -126,21 +126,28 @@ impl ServerHandler for GatewayService {
     }
 }
 
-/// Renders an upstream's result for logging — same policy as
-/// `kid-text-editor`'s own tool-call logging.
-fn output_text(response: &CallToolResponse) -> String {
-    let CallToolResponse::Complete(result) = response else {
-        return format!("{response:?}");
-    };
-    result
-        .content
-        .iter()
-        .filter_map(|block| match block {
-            ContentBlock::Text(text) => Some(text.text.as_str()),
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+/// Extends the foreign `CallToolResponse` with text rendering for
+/// logging, instead of a free function operating on it from outside —
+/// same policy as `kid-text-editor`'s own tool-call logging.
+trait ResponseTextExt {
+    fn output_text(&self) -> String;
+}
+
+impl ResponseTextExt for CallToolResponse {
+    fn output_text(&self) -> String {
+        let CallToolResponse::Complete(result) = self else {
+            return format!("{self:?}");
+        };
+        result
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::Text(text) => Some(text.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 impl GatewayService {
