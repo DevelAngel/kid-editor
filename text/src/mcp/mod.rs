@@ -25,6 +25,7 @@ use rmcp::model::{
 };
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
+use serde_json::Value;
 
 use std::path::PathBuf;
 
@@ -93,18 +94,49 @@ impl ServerHandler for McpService {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        if let Some(result) = recipe_run::call(
+        let tool_name = request.name.to_string();
+        let path = request
+            .arguments
+            .as_ref()
+            .and_then(|args| args.get("path"))
+            .and_then(Value::as_str)
+            .unwrap_or("-")
+            .to_owned();
+        tracing::info!(tool = %tool_name, path = %path, "tool called");
+        tracing::debug!(tool = %tool_name, arguments = ?request.arguments, "tool arguments");
+
+        let result = if let Some(result) = recipe_run::call(
             &self.recipes,
             &request.name,
             request.arguments.as_ref(),
             &self.workspace_root,
         ) {
-            return result.map(Into::into);
+            result.map(Into::into)
+        } else {
+            self.tool_router
+                .call(ToolCallContext::new(self, request, context))
+                .await
+        };
+
+        match &result {
+            Ok(response) => {
+                let output = output_text(response);
+                tracing::info!(tool = %tool_name, output_chars = output.chars().count(), "tool succeeded");
+                tracing::debug!(tool = %tool_name, output = %output, "tool output");
+            }
+            Err(error) => tracing::info!(tool = %tool_name, %error, "tool failed"),
         }
-        self.tool_router
-            .call(ToolCallContext::new(self, request, context))
-            .await
+
+        result
     }
+}
+
+/// Renders a tool's result for logging. `{:?}` rather than reaching into
+/// `CallToolResponse`'s content blocks — good enough for a debug-level
+/// payload dump and a rough char-count metric, without coupling this log
+/// statement to rmcp's internal result shape.
+fn output_text(response: &CallToolResponse) -> String {
+    format!("{response:?}")
 }
 
 impl McpService {
