@@ -194,4 +194,21 @@ mod tests {
         let prefixes = ["editor_", "tasks_"];
         assert_eq!(route(&prefixes, "unknown_tool"), None);
     }
+
+    #[test]
+    fn prefixed_preserves_annotations() {
+        let mut annotations = rmcp::model::ToolAnnotations::default();
+        annotations.read_only_hint = Some(true);
+        annotations.title = Some("View File or Dir".to_owned());
+
+        let tool = Tool::new("view", "view a file", Arc::new(Default::default()))
+            .with_annotations(annotations);
+
+        let result = prefixed(tool, "editor_");
+        let annotations = result
+            .annotations
+            .expect("annotations should survive prefixing");
+        assert_eq!(annotations.read_only_hint, Some(true));
+        assert_eq!(annotations.title.as_deref(), Some("View File or Dir"));
+    }
 }
