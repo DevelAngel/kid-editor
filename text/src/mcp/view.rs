@@ -22,7 +22,7 @@ impl McpService {
     #[tool(
         description = "View a file's contents (numbered lines, optionally a line range) or list a directory's entries",
         annotations(
-            title = "View File",
+            title = "View File or Dir",
             read_only_hint = true,
             destructive_hint = false,
             idempotent_hint = true,
