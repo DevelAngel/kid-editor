@@ -45,11 +45,8 @@ pub struct RecipeArg {
     pub help: String,
 }
 
-/// MCP `ToolAnnotations` hints for a recipe's generated tool. Every
-/// field is `Option<bool>`/`Option<String>` and defaults to `None` when
-/// absent from `recipes.toml` — an unset field leaves rmcp's own
-/// default in place rather than forcing every existing recipe to
-/// declare one. See `text/src/mcp/recipe_run.rs`.
+/// MCP `ToolAnnotations` hints for a recipe's generated tool — unset
+/// fields fall through to rmcp's own default. See `text/src/mcp/recipe_run.rs`.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 pub struct RecipeAnnotations {
     #[serde(default)]
