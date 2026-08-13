@@ -86,6 +86,13 @@ pub fn tools(recipes: &RecipeFile) -> Vec<Tool> {
             let Value::Object(schema) = schema else {
                 unreachable!("json!({{...}}) with object literal always produces Value::Object");
             };
+            // TODO: no ToolAnnotations set here yet — every recipe_*
+            // tool falls back to rmcp's defaults (read_only_hint: false,
+            // destructive_hint: true, ...), which is safe but too coarse
+            // for e.g. `git-status` or `git-diff`. Follow-up: optional
+            // per-recipe annotation fields on `Recipe` (`Option<bool>`,
+            // so an unset field keeps rmcp's default), read here and
+            // passed into `Tool::new(...).annotations(...)`.
             Tool::new(tool_name(name), description(recipe), Arc::new(schema))
         })
         .collect()
