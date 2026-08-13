@@ -12,13 +12,31 @@
 description = "Check that the whole project still compiles, including tests"
 run = ["cargo", "check", "--all-targets"]
 
+[recipe.check.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.lint]
 description = "Run the linter (Clippy) and report style/correctness issues"
 run = ["cargo", "clippy"]
 
+[recipe.lint.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.test]
 description = "Run the full test suite"
 run = ["cargo", "test"]
+
+[recipe.test.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
 
 [recipe.test-one]
 description = "Run a single test by name"
@@ -27,25 +45,61 @@ run = ["cargo", "test", "--", "{name}"]
 [recipe.test-one.args.name]
 help = "name of the test to run"
 
+[recipe.test-one.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.debug-native]
 description = "Build the project with debug symbols"
 run = ["cargo", "build"]
+
+[recipe.debug-native.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
 
 [recipe.release-native]
 description = "Build an optimized release binary"
 run = ["cargo", "build", "--release", "--locked"]
 
+[recipe.release-native.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.git-status]
 description = "Show which files have uncommitted changes"
 run = ["git", "status"]
+
+[recipe.git-status.annotations]
+read_only = true
+destructive = false
+idempotent = true
+open_world = false
 
 [recipe.git-diff]
 description = "Show what changed, line by line, since the last commit"
 run = ["git", "diff"]
 
+[recipe.git-diff.annotations]
+read_only = true
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.git-log]
 description = "Show recent commit history"
 run = ["git", "log", "--no-color", "--graph", "--pretty=format:%h • %s (%(decorate:prefix=,suffix= • )%cr)"]
+
+[recipe.git-log.annotations]
+read_only = true
+destructive = false
+idempotent = true
+open_world = false
 
 [recipe.git-branch]
 description = "Create and switch to a new branch"
@@ -54,6 +108,12 @@ run = ["git", "switch", "-c", "{name}"]
 [recipe.git-branch.args.name]
 help = "name of the new branch"
 
+[recipe.git-branch.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = false
+
 [recipe.git-switch]
 description = "Switch to an existing branch"
 run = ["git", "switch", "{name}"]
@@ -61,9 +121,21 @@ run = ["git", "switch", "{name}"]
 [recipe.git-switch.args.name]
 help = "name of the branch to switch to"
 
+[recipe.git-switch.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.git-pull]
 description = "Fetch and integrate changes from the remote for the current branch"
 run = ["git", "pull"]
+
+[recipe.git-pull.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = true
 
 [recipe.git-add]
 description = "Stage a file's changes so the next commit includes them"
@@ -71,6 +143,12 @@ run = ["git", "add", "{path}"]
 
 [recipe.git-add.args.path]
 help = "file or directory to stage"
+
+[recipe.git-add.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
 
 [recipe.git-mv]
 description = "Rename or move a tracked file, staging the change"
@@ -82,12 +160,24 @@ help = "current path of the tracked file"
 [recipe.git-mv.args.destination]
 help = "new path for the file"
 
+[recipe.git-mv.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = false
+
 [recipe.git-rm]
 description = "Remove a tracked file, staging the deletion"
 run = ["git", "rm", "{path}"]
 
 [recipe.git-rm.args.path]
 help = "file or directory to remove"
+
+[recipe.git-rm.annotations]
+read_only = false
+destructive = true
+idempotent = false
+open_world = false
 
 [recipe.git-restore]
 description = "Unstage a file, keeping its working-tree changes"
@@ -96,9 +186,21 @@ run = ["git", "restore", "--staged", "{path}"]
 [recipe.git-restore.args.path]
 help = "file or directory to unstage"
 
+[recipe.git-restore.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = false
+
 [recipe.git-reset-soft]
 description = "Undo the last commit, keeping its changes staged"
 run = ["git", "reset", "--soft", "HEAD~1"]
+
+[recipe.git-reset-soft.annotations]
+read_only = false
+destructive = true
+idempotent = false
+open_world = false
 
 [recipe.git-commit]
 description = "Save all staged changes as a new commit, authored by DevelAngel"
@@ -109,6 +211,12 @@ run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de
 [recipe.git-commit.args.message]
 help = "commit message"
 
+[recipe.git-commit.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = false
+
 [recipe.git-rebase]
 description = "Replay this branch's commits on top of another branch"
 run = ["git", "rebase", "{target}"]
@@ -116,21 +224,51 @@ run = ["git", "rebase", "{target}"]
 [recipe.git-rebase.args.target]
 help = "branch or commit to rebase onto"
 
+[recipe.git-rebase.annotations]
+read_only = false
+destructive = true
+idempotent = false
+open_world = false
+
 [recipe.git-rebase-continue]
 description = "Continue a rebase after fixing a conflict"
 run = ["git", "rebase", "--continue"]
+
+[recipe.git-rebase-continue.annotations]
+read_only = false
+destructive = true
+idempotent = false
+open_world = false
 
 [recipe.git-rebase-abort]
 description = "Cancel an in-progress rebase and return to the previous state"
 run = ["git", "rebase", "--abort"]
 
+[recipe.git-rebase-abort.annotations]
+read_only = false
+destructive = true
+idempotent = false
+open_world = false
+
 [recipe.git-push]
 description = "Push the current branch to origin, setting upstream if needed"
 run = ["git", "push", "--set-upstream", "origin", "HEAD"]
 
+[recipe.git-push.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = true
+
 [recipe.git-push-force]
 description = "Force-push the current branch, overwriting remote history"
 run = ["git", "push", "--force-with-lease", "origin", "HEAD"]
+
+[recipe.git-push-force.annotations]
+read_only = false
+destructive = true
+idempotent = true
+open_world = true
 
 [recipe.gh-pr-create]
 description = "Open a pull request for the current branch"
@@ -141,6 +279,12 @@ help = "PR title"
 
 [recipe.gh-pr-create.args.body]
 help = "PR description"
+
+[recipe.gh-pr-create.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = true
 
 [recipe.gh-pr-edit]
 description = "Update an existing pull request's title and/or description"
@@ -155,12 +299,24 @@ help = "new PR title"
 [recipe.gh-pr-edit.args.body]
 help = "new PR description"
 
+[recipe.gh-pr-edit.annotations]
+read_only = false
+destructive = false
+idempotent = true
+open_world = true
+
 [recipe.gh-pr-view]
 description = "Show PR metadata and issue-level comments"
 run = ["gh", "pr", "view", "{number}", "--json", "title,body,comments,reviews"]
 
 [recipe.gh-pr-view.args.number]
 help = "PR number"
+
+[recipe.gh-pr-view.annotations]
+read_only = true
+destructive = false
+idempotent = true
+open_world = true
 
 [recipe.gh-pr-review-comments]
 description = "List inline review comments on a PR"
@@ -170,6 +326,12 @@ run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments", "--jq
 
 [recipe.gh-pr-review-comments.args.number]
 help = "PR number"
+
+[recipe.gh-pr-review-comments.annotations]
+read_only = true
+destructive = false
+idempotent = true
+open_world = true
 
 [recipe.gh-pr-comment]
 description = "Post an issue-level reply on a PR"
@@ -181,6 +343,12 @@ help = "PR number"
 [recipe.gh-pr-comment.args.body]
 help = "reply text"
 
+[recipe.gh-pr-comment.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = true
+
 [recipe.gh-pr-approve]
 description = "Approve a pull request"
 run = ["gh", "pr", "review", "{number}", "--approve", "--body", "{body}"]
@@ -190,3 +358,9 @@ help = "PR number"
 
 [recipe.gh-pr-approve.args.body]
 help = "approval comment"
+
+[recipe.gh-pr-approve.annotations]
+read_only = false
+destructive = false
+idempotent = false
+open_world = true
