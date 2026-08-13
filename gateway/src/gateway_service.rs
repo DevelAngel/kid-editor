@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use rmcp::ServiceExt;
 use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, ErrorData as McpError, Implementation,
+    CallToolRequestParams, CallToolResponse, ContentBlock, ErrorData as McpError, Implementation,
     ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
 };
 use rmcp::service::{RequestContext, RunningService};
@@ -129,7 +129,18 @@ impl ServerHandler for GatewayService {
 /// Renders an upstream's result for logging — same policy as
 /// `kid-text-editor`'s own tool-call logging.
 fn output_text(response: &CallToolResponse) -> String {
-    format!("{response:?}")
+    let CallToolResponse::Complete(result) = response else {
+        return format!("{response:?}");
+    };
+    result
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Text(text) => Some(text.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl GatewayService {

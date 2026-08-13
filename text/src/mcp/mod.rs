@@ -20,7 +20,7 @@ use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, ErrorData as McpError, Implementation,
+    CallToolRequestParams, CallToolResponse, ContentBlock, ErrorData as McpError, Implementation,
     ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo,
 };
 use rmcp::service::RequestContext;
@@ -131,12 +131,24 @@ impl ServerHandler for McpService {
     }
 }
 
-/// Renders a tool's result for logging. `{:?}` rather than reaching into
-/// `CallToolResponse`'s content blocks — good enough for a debug-level
-/// payload dump and a rough char-count metric, without coupling this log
-/// statement to rmcp's internal result shape.
+/// Renders a tool's result for logging. `CallToolResponse::Complete` is
+/// the only variant every tool here produces (no streaming/partial
+/// responses in this codebase) — its text blocks are joined for a real
+/// char count. Any other variant falls back to `{:?}` rather than
+/// failing the log statement over it.
 fn output_text(response: &CallToolResponse) -> String {
-    format!("{response:?}")
+    let CallToolResponse::Complete(result) = response else {
+        return format!("{response:?}");
+    };
+    result
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Text(text) => Some(text.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl McpService {
