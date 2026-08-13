@@ -120,7 +120,7 @@ impl ServerHandler for McpService {
 
         match &result {
             Ok(response) => {
-                let output = output_text(response);
+                let output = response.output_text();
                 tracing::info!(tool = %tool_name, output_chars = output.chars().count(), "tool succeeded");
                 tracing::debug!(tool = %tool_name, output = %output, "tool output");
             }
@@ -131,24 +131,31 @@ impl ServerHandler for McpService {
     }
 }
 
-/// Renders a tool's result for logging. `CallToolResponse::Complete` is
-/// the only variant every tool here produces (no streaming/partial
-/// responses in this codebase) — its text blocks are joined for a real
-/// char count. Any other variant falls back to `{:?}` rather than
-/// failing the log statement over it.
-fn output_text(response: &CallToolResponse) -> String {
-    let CallToolResponse::Complete(result) = response else {
-        return format!("{response:?}");
-    };
-    result
-        .content
-        .iter()
-        .filter_map(|block| match block {
-            ContentBlock::Text(text) => Some(text.text.as_str()),
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+/// Extends the foreign `CallToolResponse` with text rendering for
+/// logging, instead of a free function operating on it from outside.
+trait ResponseTextExt {
+    fn output_text(&self) -> String;
+}
+
+impl ResponseTextExt for CallToolResponse {
+    /// `Complete` is the only variant every tool here produces (no
+    /// streaming/partial responses in this codebase) — its text blocks
+    /// are joined for a real char count. Any other variant falls back
+    /// to `{:?}` rather than failing the log statement over it.
+    fn output_text(&self) -> String {
+        let CallToolResponse::Complete(result) = self else {
+            return format!("{self:?}");
+        };
+        result
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                ContentBlock::Text(text) => Some(text.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 impl McpService {
