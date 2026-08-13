@@ -18,7 +18,7 @@ use std::io;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     tracing_subscriber::fmt()
-        .with_max_level(cli.verbosity)
+        .with_env_filter(cli::env_filter(&cli.verbosity))
         .with_writer(io::stderr)
         .init();
 
