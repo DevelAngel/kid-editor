@@ -23,7 +23,14 @@ struct TreeInput {
 #[tool_router(router = tree_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Show a directory as a tree, like the Unix `tree` command — faster overview than repeated `fs_view` calls"
+        description = "Show a directory as a tree, like the Unix `tree` command — faster overview than repeated `fs_view` calls",
+        annotations(
+            title = "Directory Tree",
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
     fn fs_tree(
         &self,

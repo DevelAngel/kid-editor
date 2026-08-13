@@ -22,7 +22,16 @@ pub struct StrReplaceInput {
 
 #[tool_router(router = str_replace_tool_router, vis = "pub(super)")]
 impl McpService {
-    #[tool(description = "Replace an exact, unique occurrence of old_str with new_str in a file")]
+    #[tool(
+        description = "Replace an exact, unique occurrence of old_str with new_str in a file",
+        annotations(
+            title = "Replace Text",
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
     fn fs_str_replace(
         &self,
         Parameters(input): Parameters<StrReplaceInput>,

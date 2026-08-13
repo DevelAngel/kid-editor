@@ -20,7 +20,14 @@ struct ViewInput {
 #[tool_router(router = view_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "View a file's contents (numbered lines, optionally a line range) or list a directory's entries"
+        description = "View a file's contents (numbered lines, optionally a line range) or list a directory's entries",
+        annotations(
+            title = "View File",
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
     fn fs_view(
         &self,
