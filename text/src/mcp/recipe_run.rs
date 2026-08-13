@@ -16,7 +16,9 @@
 
 use recipe::{Recipe, RecipeFile, RecipeName};
 
-use rmcp::model::{CallToolResult, ContentBlock, ErrorData as McpError, JsonObject, Tool};
+use rmcp::model::{
+    CallToolResult, ContentBlock, ErrorData as McpError, JsonObject, Tool, ToolAnnotations,
+};
 use serde_json::{Map, Value, json};
 
 use std::path::Path;
@@ -86,16 +88,24 @@ pub fn tools(recipes: &RecipeFile) -> Vec<Tool> {
             let Value::Object(schema) = schema else {
                 unreachable!("json!({{...}}) with object literal always produces Value::Object");
             };
-            // TODO: no ToolAnnotations set here yet — every recipe_*
-            // tool falls back to rmcp's defaults (read_only_hint: false,
-            // destructive_hint: true, ...), which is safe but too coarse
-            // for e.g. `git-status` or `git-diff`. Follow-up: optional
-            // per-recipe annotation fields on `Recipe` (`Option<bool>`,
-            // so an unset field keeps rmcp's default), read here and
-            // passed into `Tool::new(...).annotations(...)`.
             Tool::new(tool_name(name), description(recipe), Arc::new(schema))
+                .with_annotations(annotations(recipe))
         })
         .collect()
+}
+
+/// Maps a recipe's own optional annotation fields onto rmcp's
+/// `ToolAnnotations` — every field stays `None` (rmcp's own default)
+/// unless `recipes.toml` sets it explicitly. See `RecipeAnnotations`.
+/// `ToolAnnotations` is `#[non_exhaustive]`, hence the `..Default::default()`.
+fn annotations(recipe: &Recipe) -> ToolAnnotations {
+    let mut result = ToolAnnotations::default();
+    result.title = recipe.annotations.title.clone();
+    result.read_only_hint = recipe.annotations.read_only;
+    result.destructive_hint = recipe.annotations.destructive;
+    result.idempotent_hint = recipe.annotations.idempotent;
+    result.open_world_hint = recipe.annotations.open_world;
+    result
 }
 
 /// One line, for the tool's own `description` — what it runs and what
