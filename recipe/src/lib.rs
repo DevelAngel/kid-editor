@@ -45,6 +45,25 @@ pub struct RecipeArg {
     pub help: String,
 }
 
+/// MCP `ToolAnnotations` hints for a recipe's generated tool. Every
+/// field is `Option<bool>`/`Option<String>` and defaults to `None` when
+/// absent from `recipes.toml` — an unset field leaves rmcp's own
+/// default in place rather than forcing every existing recipe to
+/// declare one. See `text/src/mcp/recipe_run.rs`.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct RecipeAnnotations {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub read_only: Option<bool>,
+    #[serde(default)]
+    pub destructive: Option<bool>,
+    #[serde(default)]
+    pub idempotent: Option<bool>,
+    #[serde(default)]
+    pub open_world: Option<bool>,
+}
+
 /// A single recipe: what it does, what it takes, and the literal argv to
 /// run. `args` is an [`IndexMap`] because parameter order is meaningful
 /// for positional CLI usage (`recipe run test-one my_test`), not just
@@ -56,6 +75,8 @@ pub struct Recipe {
     #[serde(default)]
     pub args: IndexMap<String, RecipeArg>,
     pub run: Vec<String>,
+    #[serde(default)]
+    pub annotations: RecipeAnnotations,
 }
 
 impl Recipe {
@@ -261,6 +282,7 @@ mod tests {
                 },
             )]),
             run: vec!["echo".to_owned(), "{name}".to_owned()],
+            annotations: RecipeAnnotations::default(),
         };
         let root = assert_fs::TempDir::new().unwrap();
         let output = recipe.execute(&["hello".to_owned()], root.path()).unwrap();
@@ -278,6 +300,7 @@ mod tests {
                 },
             )]),
             run: vec!["echo".to_owned(), "{msg}-{msg}".to_owned()],
+            annotations: RecipeAnnotations::default(),
         };
         let root = assert_fs::TempDir::new().unwrap();
         let output = recipe.execute(&["a".to_owned()], root.path()).unwrap();
@@ -290,6 +313,7 @@ mod tests {
             description: String::new(),
             args: IndexMap::new(),
             run: vec!["echo".to_owned(), "fixed".to_owned()],
+            annotations: RecipeAnnotations::default(),
         };
         let root = assert_fs::TempDir::new().unwrap();
         let output = recipe.execute(&[], root.path()).unwrap();
@@ -307,6 +331,7 @@ mod tests {
                 },
             )]),
             run: vec!["echo".to_owned(), "{name}".to_owned()],
+            annotations: RecipeAnnotations::default(),
         };
         let root = assert_fs::TempDir::new().unwrap();
         assert!(matches!(
@@ -324,6 +349,7 @@ mod tests {
             description: String::new(),
             args: IndexMap::new(),
             run: vec![],
+            annotations: RecipeAnnotations::default(),
         };
         let root = assert_fs::TempDir::new().unwrap();
         assert!(matches!(
