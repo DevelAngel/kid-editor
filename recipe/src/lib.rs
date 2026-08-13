@@ -46,7 +46,7 @@ pub struct RecipeArg {
 }
 
 /// MCP `ToolAnnotations` hints for a recipe's generated tool — unset
-/// fields fall through to rmcp's own default. See `text/src/mcp/recipe_run.rs`.
+/// fields fall through to rmcp's own default.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 pub struct RecipeAnnotations {
     #[serde(default)]
