@@ -25,7 +25,12 @@ pub fn env_filter(verbosity: &Verbosity<InfoLevel>) -> EnvFilter {
     let verbosity: LevelFilter = verbosity.tracing_level_filter();
     let baseline = std::cmp::min(verbosity, LevelFilter::WARN);
     let crate_name = env!("CARGO_PKG_NAME").replace('-', "_");
-    EnvFilter::new(format!("{baseline},{crate_name}={verbosity}"))
+    let crate_directive = format!("{crate_name}={verbosity}")
+        .parse()
+        .expect("crate name and level filter always form a valid directive");
+    EnvFilter::default()
+        .add_directive(baseline.into())
+        .add_directive(crate_directive)
 }
 
 /// MCP server exposing text-editor tools
