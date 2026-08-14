@@ -9,7 +9,6 @@ mod recipe_run;
 mod remove_lines;
 mod replace_lines;
 mod search;
-mod str_replace;
 mod tree;
 mod view;
 mod workspace_path;
@@ -179,7 +178,6 @@ impl McpService {
             + Self::remove_lines_tool_router()
             + Self::replace_lines_tool_router()
             + Self::search_tool_router()
-            + Self::str_replace_tool_router()
             + Self::tree_tool_router()
             + Self::view_tool_router();
 
