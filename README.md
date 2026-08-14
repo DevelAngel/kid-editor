@@ -28,26 +28,39 @@ You shouldn't have to choose at all.
 
 ## What it does
 
-`kid-editor` exposes five tools for text editing.
+`kid-editor` exposes a handful of tools for text editing.
 Together, they mirror what a careful person does when they sit down with an unfamiliar project:
 look around, read closely, change precisely.
 
 - `fs_tree` gives the overview — the shape of the project, at a glance, the way the Unix command of the same name always has.
 - `fs_view` shows a file with line numbers, or a slice of one, or a directory's contents.
-- `fs_str_replace` changes exactly one thing:
-  it demands that the text you're replacing appears exactly once.
-  Show up twice, and the edit is refused—not silently guessed at, refused, with a request for more context.
+- ~~`fs_str_replace`~~ changed exactly one thing: it demanded that the text
+  being replaced appear exactly once, refusing the edit rather than
+  guessing which occurrence was meant. Removed anyway — plenty of other
+  agent harnesses ship the same tool, so its absence here isn't a gap.
+  More importantly, it turned out to be a trap: agents kept calling it
+  against stale, remembered file content instead of what was actually on
+  disk, even though the underlying LLM was the same one that behaved
+  correctly elsewhere. Getting it to work reliably required explicitly
+  instructing the agent to always read the file first. The line-addressed
+  tools below don't have that failure mode — a stale line number just
+  produces a visibly wrong edit or an out-of-range error, not a silent
+  match against text that's no longer there.
+- `fs_insert_lines`, `fs_remove_lines`, and `fs_replace_lines` address by
+  line number instead of by exact text, negative numbers counting from
+  the end like `tail`.
 - `fs_create` writes a new file, or overwrites an old one, on purpose.
-- `fs_insert` adds text after a given line.
 
-Five tools. Not fifty.
+A small, deliberate set of tools. Not fifty.
 That's not an accident — it's the whole design philosophy, stated as a list.
 
 ## Why it matters
 
 **Precision over collateral damage.**
-A `str_replace` that requires a unique match can't silently touch the wrong instance.
-It either finds exactly one match, or it stops and asks.
+Line-addressed edits act on an exact, resolved range — no ambiguity about
+which occurrence was meant, and no risk of matching against text the
+model only remembers rather than text that's actually there.
+An out-of-range or inverted range is refused, not silently guessed at.
 That's not a limitation — it's the point.
 
 **A sandbox, not an open door.**
