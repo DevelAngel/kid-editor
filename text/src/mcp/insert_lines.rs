@@ -1,6 +1,6 @@
-use super::line_address::{JoinLines, LineAddress};
-use super::workspace_path::{not_found_or_io, UnresolvedPath};
 use super::McpService;
+use super::line_address::{JoinLines, LineAddress};
+use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
 use rmcp::handler::server::wrapper::Parameters;
