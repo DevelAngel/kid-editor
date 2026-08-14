@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.9.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.8.0..v0.9.0) - 2026-08-14
+
+### Bug Fixes
+
+- **(mcp)** rename fs_view title to cover dir listing - ([77970ca](https://github.com/DevelAngel/matrix-mcp/commit/77970caf09f1b99bb0b42fce5c064fbb782fbfcc)) - Angelos Drossos
+- **(recipes)** reference in-repo skill, not local one - ([d53d482](https://github.com/DevelAngel/matrix-mcp/commit/d53d482f8a85de51dfce9e5964af2090db239079)) - Angelos Drossos
+- extract real text from CallToolResponse for logging - ([379bfd5](https://github.com/DevelAngel/matrix-mcp/commit/379bfd532a28ae88c06ab89e1bbbf15a727eeb40)) - Angelos Drossos
+
+### Documentation
+
+- **(mcp)** note missing recipe_* tool annotations - ([0b48cad](https://github.com/DevelAngel/matrix-mcp/commit/0b48cad4b5d28e6df544ebe664c98cd2bd6fe601)) - Angelos Drossos
+- **(recipe)** shorten RecipeAnnotations doc comment - ([4984367](https://github.com/DevelAngel/matrix-mcp/commit/498436738e6db55d0b66b6ceec4c8afce6b0d661)) - Angelos Drossos
+- **(recipe)** drop cross-file pointer from RecipeAnnotations - ([5bebdf2](https://github.com/DevelAngel/matrix-mcp/commit/5bebdf2262f0f20fd31dd03daf18b185a73ae673)) - Angelos Drossos
+- **(skills)** add code-review-request-writing-guide - ([6e3e0f1](https://github.com/DevelAngel/matrix-mcp/commit/6e3e0f179fef9ba210e25b6bc9b841631ce16962)) - Angelos Drossos
+- note fs_str_replace removal in README - ([d821ef1](https://github.com/DevelAngel/matrix-mcp/commit/d821ef1b8ba496602f88283d52553f500133699b)) - Angelos Drossos
+
+### Features
+
+- **(gateway)** log tool calls with path and size - ([f257309](https://github.com/DevelAngel/matrix-mcp/commit/f25730901a94c74dc0e0632e89ae5fa2ebd6b6d0)) - Angelos Drossos
+- **(mcp)** add annotations to static fs tools - ([777e3f3](https://github.com/DevelAngel/matrix-mcp/commit/777e3f35216d2b503b6dba5cd6b8a2e946513be3)) - Angelos Drossos
+- **(mcp)** wire recipe annotations into generated tools - ([c966983](https://github.com/DevelAngel/matrix-mcp/commit/c9669830e60466a4920bd28bb05573ff681b601b)) - Angelos Drossos
+- **(recipe)** add optional annotation fields to Recipe - ([e7186bd](https://github.com/DevelAngel/matrix-mcp/commit/e7186bd0423432cfb875c54cdca5811d0b1e8ca4)) - Angelos Drossos
+- **(text)** log tool calls with path and size - ([0878c61](https://github.com/DevelAngel/matrix-mcp/commit/0878c6139872f9d2346c726d0ccfd40bf46ffe7b)) - Angelos Drossos
+- **(tools)** add line-addressed edit tools - ([ab8da81](https://github.com/DevelAngel/matrix-mcp/commit/ab8da8197fb4ea673652973102c2a60f2498d0a1)) - Angelos Drossos
+- add --log-baseline, verbosity applies repo-wide - ([81214b9](https://github.com/DevelAngel/matrix-mcp/commit/81214b9804e191fd201676e84753feb3ea22f64e)) - Angelos Drossos
+
+### Miscellaneous Chores
+
+- **(recipes)** declare annotations for existing recipes - ([fe0d1c9](https://github.com/DevelAngel/matrix-mcp/commit/fe0d1c9032d83272f06d1832cb81c9bad7da3137)) - Angelos Drossos
+- **(recipes)** point gh-pr-create/-edit at mr-writing-guide - ([f05752e](https://github.com/DevelAngel/matrix-mcp/commit/f05752efe97903f357059415f917291aeccdbfd6)) - Angelos Drossos
+
+### Refactoring
+
+- **(tools)** replace line-address free fns with types - ([6339786](https://github.com/DevelAngel/matrix-mcp/commit/633978634108424f636e85412f008ce2e3f4ffc2)) - Angelos Drossos
+- **(tools)** [**breaking**] remove fs_str_replace and fs_insert - ([82d0ecd](https://github.com/DevelAngel/matrix-mcp/commit/82d0ecd50559959e07d87b8d4564f100985f6d7a)) - Angelos Drossos
+- build EnvFilter from typed Directives - ([375623e](https://github.com/DevelAngel/matrix-mcp/commit/375623e228dfff13f1716f9eb204f235dc308d08)) - Angelos Drossos
+- turn output_text into an extension trait method - ([7982d3d](https://github.com/DevelAngel/matrix-mcp/commit/7982d3d1d1858a81940e6ccb648f4290a3b5cba3)) - Angelos Drossos
+- extract kid-logging crate for shared env_filter - ([25c4ca5](https://github.com/DevelAngel/matrix-mcp/commit/25c4ca5b8dc115dab24444d83ae3b3f4fdbca7cf)) - Angelos Drossos
+- list only bin crates as workspace members - ([ac717f6](https://github.com/DevelAngel/matrix-mcp/commit/ac717f63006a50d0b897dc56bbe079137b1bed3b)) - Angelos Drossos
+
+### Style
+
+- **(recipes)** reference skill by name, not path - ([b3e8d2d](https://github.com/DevelAngel/matrix-mcp/commit/b3e8d2da5a63f141cddefd09e4436de92770d42d)) - Angelos Drossos
+
+### Tests
+
+- **(gateway)** assert prefixed() preserves annotations - ([c6025fd](https://github.com/DevelAngel/matrix-mcp/commit/c6025fd1d2c731af9f21e1be2b93934ba918f8c9)) - Angelos Drossos
+
 ## [0.8.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.7.0..v0.8.0) - 2026-08-12
 
 ### Bug Fixes
