@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["text", "recipe", "oauth", "gateway"]
+members = ["text", "recipe", "oauth", "gateway", "logging"]
 
 [workspace.package]
 version = "0.8.0"
