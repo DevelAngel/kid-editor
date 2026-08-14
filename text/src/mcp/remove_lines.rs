@@ -1,5 +1,5 @@
 use super::McpService;
-use super::line_address::{join_lines, resolve_range};
+use super::line_address::{JoinLines, LineRange};
 use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
@@ -45,11 +45,12 @@ impl McpService {
             .map_err(|e| not_found_or_io(&path, e))?;
 
         let mut lines: Vec<&str> = content.lines().collect();
-        let (start, end) = resolve_range(input.start_line, input.end_line, lines.len())
+        let (start, end) = LineRange::new(input.start_line, input.end_line)
+            .resolve(lines.len())
             .map_err(|msg| McpError::invalid_params(msg, None))?;
         let removed = end - start + 1;
         lines.drain((start - 1)..end);
-        let updated = join_lines(&lines, &content);
+        let updated = lines.rejoin(&content);
 
         let write = path.into_write_buffer(self.recipe_toml_protected_path.as_deref())?;
         write

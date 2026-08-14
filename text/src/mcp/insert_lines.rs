@@ -1,4 +1,4 @@
-use super::line_address::{join_lines, resolve_line};
+use super::line_address::{JoinLines, LineAddress};
 use super::workspace_path::{not_found_or_io, UnresolvedPath};
 use super::McpService;
 
@@ -59,7 +59,8 @@ impl McpService {
         let anchor = if total_lines == 0 {
             0
         } else {
-            let resolved = resolve_line(input.line, total_lines)
+            let resolved = LineAddress::new(input.line)
+                .resolve(total_lines)
                 .map_err(|msg| McpError::invalid_params(msg, None))?;
             match input.position {
                 Position::Before => resolved - 1,
@@ -67,7 +68,7 @@ impl McpService {
             }
         };
         lines.insert(anchor, input.new_str.as_str());
-        let updated = join_lines(&lines, &content);
+        let updated = lines.rejoin(&content);
 
         let write = path.into_write_buffer(self.recipe_toml_protected_path.as_deref())?;
         write
