@@ -271,7 +271,7 @@ idempotent = true
 open_world = true
 
 [recipe.gh-pr-create]
-description = "Open a pull request for the current branch"
+description = "Open a pull request for the current branch. Write the body per the mr-writing-guide skill (TL;DR, Why/What/How, Breaking changes)."
 run = ["gh", "pr", "create", "--title", "{title}", "--body", "{body}", "--base", "main"]
 
 [recipe.gh-pr-create.args.title]
@@ -287,7 +287,7 @@ idempotent = false
 open_world = true
 
 [recipe.gh-pr-edit]
-description = "Update an existing pull request's title and/or description"
+description = "Update an existing pull request's title and/or description. Follow the mr-writing-guide skill when rewriting the body."
 run = ["gh", "pr", "edit", "{number}", "--title", "{title}", "--body", "{body}"]
 
 [recipe.gh-pr-edit.args.number]
