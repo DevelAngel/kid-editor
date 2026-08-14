@@ -41,6 +41,7 @@ type-state-builder.workspace = true
 toml.workspace = true
 recipe = { path = "../recipe", package = "kid-recipe" }
 oauth = { path = "../oauth", package = "kid-oauth", features = ["server"] }
+logging = { path = "../logging", package = "kid-logging" }
 
 [dev-dependencies]
 assert_fs.workspace = true
