@@ -1,6 +1,6 @@
 # kid-editor
 
-*Keep It Done: one precise edit, not a conversation about the file.*
+_Keep It Done: one precise edit, not a conversation about the file._
 
 ## TL;DR
 
@@ -34,25 +34,32 @@ look around, read closely, change precisely.
 
 - `fs_tree` gives the overview — the shape of the project, at a glance, the way the Unix command of the same name always has.
 - `fs_view` shows a file with line numbers, or a slice of one, or a directory's contents.
-- ~~`fs_str_replace`~~ changed exactly one thing: it demanded that the text
-  being replaced appear exactly once, refusing the edit rather than
-  guessing which occurrence was meant. Removed anyway — plenty of other
-  agent harnesses ship the same tool, so its absence here isn't a gap.
-  More importantly, it turned out to be a trap: agents kept calling it
-  against stale, remembered file content instead of what was actually on
-  disk, even though the underlying LLM was the same one that behaved
-  correctly elsewhere. Getting it to work reliably required explicitly
-  instructing the agent to always read the file first. The line-addressed
-  tools below don't have that failure mode — a stale line number just
-  produces a visibly wrong edit or an out-of-range error, not a silent
-  match against text that's no longer there.
-- `fs_insert_lines`, `fs_remove_lines`, and `fs_replace_lines` address by
-  line number instead of by exact text, negative numbers counting from
-  the end like `tail`.
+- ~~`fs_str_replace`~~ changed exactly one thing: it demanded that the text being replaced appear exactly once,
+  refusing the edit rather than guessing which occurrence was meant.
+  Removed anyway — plenty of other agent harnesses ship the same tool, so its absence here isn't a gap.
+  More importantly, it turned out to be a trap:
+  agents kept calling it against stale, remembered file content instead of what was actually on disk,
+  even though the underlying LLM was the same one that behaved correctly elsewhere.
+  Getting it to work reliably required explicitly instructing the agent to always read the file first.
+  The line-addressed tools below don't have that failure mode —
+  a stale line number just produces a visibly wrong edit or an out-of-range error,
+  not a silent match against text that's no longer there.
+- `fs_insert_lines`, `fs_remove_lines`, and `fs_replace_lines` address by line number instead of by exact text,
+  negative numbers counting from the end like `tail`.
 - `fs_create` writes a new file, or overwrites an old one, on purpose.
 
 A small, deliberate set of tools. Not fifty.
 That's not an accident — it's the whole design philosophy, stated as a list.
+
+## The use case
+
+`kid-editor` is useful when a chat-based model should work on a project without receiving unrestricted filesystem or shell access.
+
+Connected to an MCP-capable chat client, the model can inspect the project, read relevant files, and apply small, deliberate changes.
+This creates much of the practical feel of an agent while keeping the available actions narrow and auditable.
+
+The server does not make the model autonomous.
+It only gives the model a small set of project-editing primitives.
 
 ## Why it matters
 
@@ -91,6 +98,24 @@ Any MCP-capable client can talk to it.
 Want to poke at the tools yourself, outside of any particular client?
 The [MCP Inspector](https://modelcontextprotocol.io/legacy/tools/inspector) — the reference tool for the standard — is built exactly for that.
 
+## Design hypothesis
+
+A large part of the usefulness people associate with coding agents comes from the ability to inspect a project
+and make targeted changes—not necessarily from unrestricted shell access or a fully autonomous agent loop.
+
+`kid-editor` explores that smaller surface area:
+give the model enough access to work on files, but not enough access to wander through the system.
+
+This is a hypothesis about the useful boundary, not a claim that a small tool set replaces a full coding agent.
+
+## Deployment trade-off
+
+The security boundary lives on the server, which means a remote MCP client must be able to reach that server.
+
+For a local coding agent, installation is usually enough.
+For a hosted chat client, `kid-editor` generally requires a publicly reachable deployment and OAuth configuration.
+That makes the setup more involved, but it also keeps filesystem access under the user's control rather than inside the hosted chat environment.
+
 ## How this differs from a coding agent
 
 You've probably used something like this already — Goose, Claude Code, Cursor, Pi, Open Code.
@@ -106,6 +131,8 @@ It usually runs commands, manages its own context window, and makes judgment cal
 `kid-editor` does none of that.
 It's the opposite of an agent, really—it has no opinion about what should happen next.
 It's a door with a lock on it, not the person walking through the door.
+
+`kid-editor` provides the tools; the client or agent decides when and how to use them.
 
 That difference has a consequence:
 `kid-editor` doesn't care which model is on the other end, or what agent framework is asking it for a file.
