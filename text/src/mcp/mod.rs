@@ -3,8 +3,11 @@
 //! All paths, relative or absolute, are resolved against the workspace root
 //! and rejected if they would escape it.
 mod create;
-mod insert;
+mod insert_lines;
+mod line_address;
 mod recipe_run;
+mod remove_lines;
+mod replace_lines;
 mod search;
 mod str_replace;
 mod tree;
@@ -172,7 +175,9 @@ impl McpService {
         recipe_toml_protected_path: Option<PathBuf>,
     ) -> Self {
         let tool_router = Self::create_tool_router()
-            + Self::insert_tool_router()
+            + Self::insert_lines_tool_router()
+            + Self::remove_lines_tool_router()
+            + Self::replace_lines_tool_router()
             + Self::search_tool_router()
             + Self::str_replace_tool_router()
             + Self::tree_tool_router()
