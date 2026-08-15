@@ -1,5 +1,6 @@
 use recipe::{Recipe, RecipeFile, RecipeName};
 
+use anyhow::{Context, Result};
 use clap::{Arg, ArgMatches, Command, Parser, Subcommand, ValueHint};
 
 use std::env;
@@ -45,20 +46,26 @@ enum TopCommand {
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-
-    let file = match RecipeFile::load(&cli.file) {
-        Ok(file) => file,
+    // Clap's own parse errors (bad flags, missing required args) already
+    // print a well-formatted usage message and pick the right exit code
+    // via `.exit()`; only our own errors below go through `anyhow`.
+    match try_main() {
+        Ok(code) => code,
         Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
+            eprintln!("{e:?}");
+            ExitCode::FAILURE
         }
-    };
+    }
+}
+
+fn try_main() -> Result<ExitCode> {
+    let cli = Cli::parse();
+    let file = RecipeFile::load(&cli.file).context("failed to load recipe file")?;
 
     match cli.command {
         TopCommand::List => {
             list(&file);
-            ExitCode::SUCCESS
+            Ok(ExitCode::SUCCESS)
         }
         TopCommand::Run { cwd, name, args } => {
             let cwd =
@@ -86,12 +93,13 @@ fn list(file: &RecipeFile) {
     }
 }
 
-fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> ExitCode {
-    let Some(recipe) = file.get(&RecipeName::from(name)) else {
-        eprintln!("{name}: no such recipe");
-        return ExitCode::FAILURE;
-    };
+fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result<ExitCode> {
+    let recipe = file
+        .get(&RecipeName::from(name))
+        .with_context(|| format!("{name}: no such recipe"))?;
 
+    // A malformed `--<param>` invocation is a usage error, not one of
+    // ours — let clap print its own usage message and pick the exit code.
     let matches = match parse_recipe_args(name, recipe, raw_args) {
         Ok(matches) => matches,
         Err(e) => e.exit(),
@@ -111,20 +119,16 @@ fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> ExitCo
         })
         .collect();
 
-    match recipe.execute(&provided, cwd) {
-        Ok(output) => {
-            print!("{}", String::from_utf8_lossy(&output.stdout));
-            eprint!("{}", String::from_utf8_lossy(&output.stderr));
-            match output.status.code() {
-                Some(code) => ExitCode::from(code as u8),
-                None => ExitCode::FAILURE,
-            }
-        }
-        Err(e) => {
-            eprintln!("{e}");
-            ExitCode::FAILURE
-        }
-    }
+    let output = recipe
+        .execute(&provided, cwd)
+        .with_context(|| format!("failed to run recipe `{name}`"))?;
+
+    print!("{}", String::from_utf8_lossy(&output.stdout));
+    eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    Ok(match output.status.code() {
+        Some(code) => ExitCode::from(code as u8),
+        None => ExitCode::FAILURE,
+    })
 }
 
 /// Builds a `Command` from `recipe`'s own `args` map, with `--<param>`
