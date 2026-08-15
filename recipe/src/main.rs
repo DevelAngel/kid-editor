@@ -5,6 +5,7 @@ use clap::{Arg, ArgMatches, Command, Parser, Subcommand, ValueHint};
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process;
 
 /// Runs recipes declared in a `recipes.toml` file — a minimal, shell-free
 /// alternative to `just`.
@@ -109,11 +110,17 @@ fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result
 
     print!("{}", String::from_utf8_lossy(&output.stdout));
     eprint!("{}", String::from_utf8_lossy(&output.stderr));
-    // `Result<(), E>`'s `Termination` impl always exits with code 1 on
-    // `Err`, which can't express the recipe's own exit code — pass that
-    // through directly instead. A missing code (killed by signal) maps to
-    // 1, matching the failure code `Result<(), E>` would use anyway.
-    std::process::exit(output.status.code().unwrap_or(1));
+    // `run` never actually returns `Ok(())` — it either bubbles an error
+    // via `?` or ends the process here with the recipe's own exit code,
+    // which `Result<(), E>`'s `Termination` impl couldn't express (it
+    // always exits 1 on `Err`). `Result<!, E>` would state that contract
+    // in the signature, but `!` as a generic argument is still unstable
+    // (E0658, the `never_type` feature) — `Result<()>` is the closest
+    // stable equivalent, since `process::exit`'s `!` return coerces into
+    // it here regardless.
+    // A missing code (killed by signal) maps to 1, matching the failure
+    // code `Result<(), E>` would use anyway.
+    process::exit(output.status.code().unwrap_or(1));
 }
 
 /// Builds a `Command` from `recipe`'s own `args` map, with `--<param>`
