@@ -5,7 +5,6 @@ use clap::{Arg, ArgMatches, Command, Parser, Subcommand, ValueHint};
 
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
 /// Runs recipes declared in a `recipes.toml` file — a minimal, shell-free
 /// alternative to `just`.
@@ -45,34 +44,19 @@ enum TopCommand {
     },
 }
 
-fn main() -> ExitCode {
-    // Clap's own parse errors (bad flags, missing required args) already
-    // print a well-formatted usage message and pick the right exit code
-    // via `.exit()`; only our own errors below go through `anyhow`.
-    match try_main() {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("{e:?}");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn try_main() -> Result<ExitCode> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     let file = RecipeFile::load(&cli.file).context("failed to load recipe file")?;
 
     match cli.command {
-        TopCommand::List => {
-            list(&file);
-            Ok(ExitCode::SUCCESS)
-        }
+        TopCommand::List => list(&file),
         TopCommand::Run { cwd, name, args } => {
             let cwd =
                 cwd.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-            run(&file, &name, &args, &cwd)
+            run(&file, &name, &args, &cwd)?;
         }
     }
+    Ok(())
 }
 
 fn list(file: &RecipeFile) {
@@ -93,7 +77,7 @@ fn list(file: &RecipeFile) {
     }
 }
 
-fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result<ExitCode> {
+fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result<()> {
     let recipe = file
         .get(&RecipeName::from(name))
         .with_context(|| format!("{name}: no such recipe"))?;
@@ -125,10 +109,11 @@ fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result
 
     print!("{}", String::from_utf8_lossy(&output.stdout));
     eprint!("{}", String::from_utf8_lossy(&output.stderr));
-    Ok(match output.status.code() {
-        Some(code) => ExitCode::from(code as u8),
-        None => ExitCode::FAILURE,
-    })
+    // `Result<(), E>`'s `Termination` impl always exits with code 1 on
+    // `Err`, which can't express the recipe's own exit code — pass that
+    // through directly instead. A missing code (killed by signal) maps to
+    // 1, matching the failure code `Result<(), E>` would use anyway.
+    std::process::exit(output.status.code().unwrap_or(1));
 }
 
 /// Builds a `Command` from `recipe`'s own `args` map, with `--<param>`
