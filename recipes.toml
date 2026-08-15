@@ -8,64 +8,64 @@
 # array directly if a specific extra flag turns out to be needed
 # regularly, rather than reopening free-form argument passthrough.
 
-[recipe.check]
+[recipe.rust-check]
 description = "Check that the whole project still compiles, including tests"
 run = ["cargo", "check", "--all-targets"]
 
-[recipe.check.annotations]
+[recipe.rust-check.annotations]
 read_only = false
 destructive = false
 idempotent = true
 open_world = false
 
-[recipe.lint]
+[recipe.rust-lint]
 description = "Run the linter (Clippy) and report style/correctness issues"
 run = ["cargo", "clippy"]
 
-[recipe.lint.annotations]
+[recipe.rust-lint.annotations]
 read_only = false
 destructive = false
 idempotent = true
 open_world = false
 
-[recipe.test]
+[recipe.rust-test]
 description = "Run the full test suite"
 run = ["cargo", "test"]
 
-[recipe.test.annotations]
+[recipe.rust-test.annotations]
 read_only = false
 destructive = false
 idempotent = true
 open_world = false
 
-[recipe.test-one]
+[recipe.rust-test-one]
 description = "Run a single test by name"
 run = ["cargo", "test", "--", "{name}"]
 
-[recipe.test-one.args.name]
+[recipe.rust-test-one.args.name]
 help = "name of the test to run"
 
-[recipe.test-one.annotations]
+[recipe.rust-test-one.annotations]
 read_only = false
 destructive = false
 idempotent = true
 open_world = false
 
-[recipe.debug-native]
+[recipe.rust-build-debug]
 description = "Build the project with debug symbols"
 run = ["cargo", "build"]
 
-[recipe.debug-native.annotations]
+[recipe.rust-build-debug.annotations]
 read_only = false
 destructive = false
 idempotent = true
 open_world = false
 
-[recipe.release-native]
+[recipe.rust-build-release]
 description = "Build an optimized release binary"
 run = ["cargo", "build", "--release", "--locked"]
 
-[recipe.release-native.annotations]
+[recipe.rust-build-release.annotations]
 read_only = false
 destructive = false
 idempotent = true
