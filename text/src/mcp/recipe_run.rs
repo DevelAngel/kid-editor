@@ -213,7 +213,13 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../recipes.toml");
         let file = discover(&path);
         assert!(!file.is_empty(), "expected recipes.toml to declare recipes");
-        for name in ["check", "lint", "test", "test-one", "git-commit"] {
+        for name in [
+            "rust-check",
+            "rust-lint",
+            "rust-test",
+            "rust-test-one",
+            "git-commit",
+        ] {
             assert!(
                 file.get(&RecipeName::from(name)).is_some(),
                 "expected recipe {name:?} to be declared"
