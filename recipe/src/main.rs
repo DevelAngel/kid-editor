@@ -1,11 +1,18 @@
-use recipe::{Recipe, RecipeFile, RecipeName};
+use recipe::{RecipeFile, RecipeName};
 
 use anyhow::{Context, Result};
-use clap::{Arg, ArgMatches, Command, Parser, Subcommand, ValueHint};
+use clap::{
+    Arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
+};
 
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process;
+
+/// Single source of truth for `--file`'s default, referenced both by
+/// `Cli`'s derive attribute and by `preparse_file_arg` (which needs a
+/// fallback before `Cli` itself can be built — see below).
+const DEFAULT_RECIPE_FILE: &str = "recipes.toml";
 
 /// Runs recipes declared in a `recipes.toml` file — a minimal, shell-free
 /// alternative to `just`.
@@ -13,7 +20,7 @@ use std::process;
 #[command(name = "kid-recipes", version)]
 struct Cli {
     /// Path to the recipe file.
-    #[arg(long, default_value = "recipes.toml", value_hint = ValueHint::FilePath)]
+    #[arg(long, default_value = DEFAULT_RECIPE_FILE, value_hint = ValueHint::FilePath)]
     file: PathBuf,
 
     #[command(subcommand)]
@@ -30,34 +37,95 @@ enum TopCommand {
         /// directory.
         #[arg(long, value_hint = ValueHint::DirPath)]
         cwd: Option<PathBuf>,
-
-        /// Name of the recipe to run.
-        name: String,
-
-        /// Recipe-specific `--<param> <value>` pairs, declared by the
-        /// recipe itself in `recipes.toml`. Captured raw here — which
-        /// params a given recipe takes is runtime data `Cli` can't know
-        /// about at parse time — and matched against that recipe's own
-        /// `args` map afterward, once the file is loaded (see
-        /// `parse_recipe_args`).
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let file = RecipeFile::load(&cli.file).context("failed to load recipe file")?;
+    let file_path = preparse_file_arg(&env::args().collect::<Vec<_>>());
+    let file = RecipeFile::load(&file_path).context("failed to load recipe file")?;
+
+    let matches = augment_with_recipes(Cli::command(), &file).get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
     match cli.command {
         TopCommand::List => list(&file),
-        TopCommand::Run { cwd, name, args } => {
+        TopCommand::Run { cwd } => {
             let cwd =
                 cwd.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-            run(&file, &name, &args, &cwd)?;
+            let Some((name, recipe_matches)) = matches
+                .subcommand_matches("run")
+                .and_then(ArgMatches::subcommand)
+            else {
+                unreachable!("`augment_with_recipes` sets subcommand_required(true) on `run`");
+            };
+            run(&file, name, recipe_matches, &cwd)?;
         }
     }
     Ok(())
+}
+
+/// Scans argv for a top-level `--file`/`--file=VALUE` occurring before the
+/// first subcommand token (`list` or `run`). Must run before the recipe
+/// file is loaded, since `augment_with_recipes` needs that file to
+/// generate per-recipe subcommands and their `--<param>` flags — the
+/// entire reason this CLI can't just call `Cli::parse()` directly.
+///
+/// A `--file` appearing after `run <recipe-name>` belongs to that
+/// recipe's own generated flags (a recipe may itself declare a parameter
+/// named `file`), not to this one — stopping the scan at the subcommand
+/// token keeps that distinction intact, matching clap's own
+/// non-global-arg scoping rather than special-casing it.
+fn preparse_file_arg(args: &[String]) -> PathBuf {
+    let mut file = PathBuf::from(DEFAULT_RECIPE_FILE);
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "list" | "run" => break,
+            "--file" => {
+                if let Some(value) = iter.next() {
+                    file = PathBuf::from(value);
+                }
+            }
+            arg => {
+                if let Some(value) = arg.strip_prefix("--file=") {
+                    file = PathBuf::from(value);
+                }
+            }
+        }
+    }
+    file
+}
+
+/// Appends one subcommand per declared recipe under `run`, with
+/// `--<param>` flags generated from that recipe's own `args` map (name
+/// and `help` text included). This is the one part of the CLI that can't
+/// come from derive: recipe names and their parameters are runtime data,
+/// only known once `recipes.toml` is loaded. Everything else — `--file`,
+/// `list`, `run --cwd` — stays declared on `Cli`/`TopCommand` above and
+/// is read back through `Cli::from_arg_matches`.
+fn augment_with_recipes(cli: Command, file: &RecipeFile) -> Command {
+    cli.mut_subcommand("run", |run_cmd| {
+        let mut run_cmd = run_cmd
+            .subcommand_required(true)
+            .arg_required_else_help(true);
+        for (name, recipe) in file.iter() {
+            let mut sub = Command::new(name.as_str().to_owned());
+            if !recipe.description.is_empty() {
+                sub = sub.about(recipe.description.clone());
+            }
+            for (arg_name, arg) in &recipe.args {
+                let mut a = Arg::new(arg_name.clone())
+                    .long(arg_name.clone())
+                    .required(true);
+                if !arg.help.is_empty() {
+                    a = a.help(arg.help.clone());
+                }
+                sub = sub.arg(a);
+            }
+            run_cmd = run_cmd.subcommand(sub);
+        }
+        run_cmd
+    })
 }
 
 fn list(file: &RecipeFile) {
@@ -78,20 +146,15 @@ fn list(file: &RecipeFile) {
     }
 }
 
-fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result<()> {
+fn run(file: &RecipeFile, name: &str, matches: &ArgMatches, cwd: &Path) -> Result<()> {
+    // `matches` came from a subcommand `augment_with_recipes` built
+    // directly out of `file.iter()`, so `name` is guaranteed present.
     let recipe = file
         .get(&RecipeName::from(name))
         .with_context(|| format!("{name}: no such recipe"))?;
 
-    // A malformed `--<param>` invocation is a usage error, not one of
-    // ours — let clap print its own usage message and pick the exit code.
-    let matches = match parse_recipe_args(name, recipe, raw_args) {
-        Ok(matches) => matches,
-        Err(e) => e.exit(),
-    };
-
-    // clap enforces `required(true)` on every generated arg above, so each
-    // key is guaranteed present; `unwrap_or_default` is only a defensive
+    // clap enforces `required(true)` on every generated arg, so each key
+    // is guaranteed present; `unwrap_or_default` is only a defensive
     // fallback, never expected to trigger.
     let provided: Vec<String> = recipe
         .args
@@ -121,30 +184,4 @@ fn run(file: &RecipeFile, name: &str, raw_args: &[String], cwd: &Path) -> Result
     // A missing code (killed by signal) maps to 1, matching the failure
     // code `Result<(), E>` would use anyway.
     process::exit(output.status.code().unwrap_or(1));
-}
-
-/// Builds a `Command` from `recipe`'s own `args` map, with `--<param>`
-/// flags carrying that recipe's declared `help` text, then parses
-/// `raw_args` (everything `TopCommand::Run::args` captured verbatim)
-/// against it. This is the one part of the CLI that can't come from
-/// `Cli`'s derive definition: a recipe's parameters are runtime data,
-/// only known once `recipes.toml` is loaded.
-fn parse_recipe_args(
-    name: &str,
-    recipe: &Recipe,
-    raw_args: &[String],
-) -> clap::error::Result<ArgMatches> {
-    let mut cmd = Command::new(name.to_owned());
-    for (arg_name, arg) in &recipe.args {
-        let mut a = Arg::new(arg_name.clone())
-            .long(arg_name.clone())
-            .required(true);
-        if !arg.help.is_empty() {
-            a = a.help(arg.help.clone());
-        }
-        cmd = cmd.arg(a);
-    }
-    // clap expects the first item to be the program name; `name` itself
-    // serves that purpose here, since it's already what `cmd` is named.
-    cmd.try_get_matches_from(std::iter::once(name.to_owned()).chain(raw_args.iter().cloned()))
 }
