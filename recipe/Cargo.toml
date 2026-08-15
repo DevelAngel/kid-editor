@@ -14,10 +14,6 @@ workspace = true
 [lib]
 name = "recipe"
 
-[[bin]]
-name = "recipe"
-path = "src/bin/recipe.rs"
-
 [dependencies]
 clap.workspace = true
 indexmap = { workspace = true, features = ["serde"] }

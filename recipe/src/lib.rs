@@ -4,8 +4,6 @@
 //! another file, or run through a shell — see the project's ADR 0004 for
 //! why those omissions are deliberate.
 
-pub mod cli;
-
 use indexmap::IndexMap;
 use serde::Deserialize;
 
@@ -63,8 +61,8 @@ pub struct RecipeAnnotations {
 
 /// A single recipe: what it does, what it takes, and the literal argv to
 /// run. `args` is an [`IndexMap`] because parameter order is meaningful
-/// for positional CLI usage (`recipe run test-one my_test`), not just
-/// for display.
+/// for `execute`'s positional `provided` slice, not just for display —
+/// the CLI itself maps its named `--<param>` flags onto that order.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct Recipe {
     #[serde(default)]
