@@ -77,6 +77,7 @@ impl ServerHandler for McpService {
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
+                .enable_resources_subscribe()
                 .build(),
         )
         .with_server_info(Implementation::new(
