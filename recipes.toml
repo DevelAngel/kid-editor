@@ -13,6 +13,7 @@ description = "Check that the whole project still compiles, including tests"
 run = ["cargo", "check", "--all-targets"]
 
 [recipe.rust-check.annotations]
+title = "Check"
 read_only = false
 destructive = false
 idempotent = true
@@ -23,6 +24,7 @@ description = "Run the linter (Clippy) and report style/correctness issues"
 run = ["cargo", "clippy"]
 
 [recipe.rust-lint.annotations]
+title = "Lint"
 read_only = false
 destructive = false
 idempotent = true
@@ -33,6 +35,7 @@ description = "Run the full test suite"
 run = ["cargo", "test"]
 
 [recipe.rust-test.annotations]
+title = "Test"
 read_only = false
 destructive = false
 idempotent = true
@@ -46,6 +49,7 @@ run = ["cargo", "test", "--", "{name}"]
 help = "name of the test to run"
 
 [recipe.rust-test-one.annotations]
+title = "Test One"
 read_only = false
 destructive = false
 idempotent = true
@@ -56,6 +60,7 @@ description = "Build the project with debug symbols"
 run = ["cargo", "build"]
 
 [recipe.rust-build-debug.annotations]
+title = "Build (Debug)"
 read_only = false
 destructive = false
 idempotent = true
@@ -66,6 +71,7 @@ description = "Build an optimized release binary"
 run = ["cargo", "build", "--release", "--locked"]
 
 [recipe.rust-build-release.annotations]
+title = "Build (Release)"
 read_only = false
 destructive = false
 idempotent = true
@@ -76,6 +82,7 @@ description = "Show which files have uncommitted changes"
 run = ["git", "status"]
 
 [recipe.git-status.annotations]
+title = "Git Status"
 read_only = true
 destructive = false
 idempotent = true
@@ -86,6 +93,7 @@ description = "Show what changed, line by line, since the last commit"
 run = ["git", "diff"]
 
 [recipe.git-diff.annotations]
+title = "Git Diff"
 read_only = true
 destructive = false
 idempotent = true
@@ -96,6 +104,7 @@ description = "Show recent commit history"
 run = ["git", "log", "--no-color", "--graph", "--pretty=format:%h • %s (%(decorate:prefix=,suffix= • )%cr)"]
 
 [recipe.git-log.annotations]
+title = "Git Log"
 read_only = true
 destructive = false
 idempotent = true
@@ -109,6 +118,7 @@ run = ["git", "switch", "-c", "{name}"]
 help = "name of the new branch"
 
 [recipe.git-branch.annotations]
+title = "Create Branch"
 read_only = false
 destructive = false
 idempotent = false
@@ -122,6 +132,7 @@ run = ["git", "switch", "{name}"]
 help = "name of the branch to switch to"
 
 [recipe.git-switch.annotations]
+title = "Switch Branch"
 read_only = false
 destructive = false
 idempotent = true
@@ -132,6 +143,7 @@ description = "Fetch and integrate changes from the remote for the current branc
 run = ["git", "pull"]
 
 [recipe.git-pull.annotations]
+title = "Git Pull"
 read_only = false
 destructive = false
 idempotent = true
@@ -145,6 +157,7 @@ run = ["git", "add", "{path}"]
 help = "file or directory to stage"
 
 [recipe.git-add.annotations]
+title = "Stage File"
 read_only = false
 destructive = false
 idempotent = true
@@ -161,6 +174,7 @@ help = "current path of the tracked file"
 help = "new path for the file"
 
 [recipe.git-mv.annotations]
+title = "Move File"
 read_only = false
 destructive = false
 idempotent = false
@@ -174,6 +188,7 @@ run = ["git", "rm", "{path}"]
 help = "file or directory to remove"
 
 [recipe.git-rm.annotations]
+title = "Remove File"
 read_only = false
 destructive = true
 idempotent = false
@@ -187,6 +202,7 @@ run = ["git", "restore", "--staged", "{path}"]
 help = "file or directory to unstage"
 
 [recipe.git-restore.annotations]
+title = "Unstage File"
 read_only = false
 destructive = false
 idempotent = true
@@ -197,6 +213,7 @@ description = "Undo the last commit, keeping its changes staged"
 run = ["git", "reset", "--soft", "HEAD~1"]
 
 [recipe.git-reset-soft.annotations]
+title = "Undo Last Commit"
 read_only = false
 destructive = true
 idempotent = false
@@ -212,6 +229,7 @@ run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de
 help = "commit message"
 
 [recipe.git-commit.annotations]
+title = "Commit"
 read_only = false
 destructive = false
 idempotent = false
@@ -225,6 +243,7 @@ run = ["git", "rebase", "{target}"]
 help = "branch or commit to rebase onto"
 
 [recipe.git-rebase.annotations]
+title = "Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -235,6 +254,7 @@ description = "Continue a rebase after fixing a conflict"
 run = ["git", "rebase", "--continue"]
 
 [recipe.git-rebase-continue.annotations]
+title = "Continue Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -245,6 +265,7 @@ description = "Cancel an in-progress rebase and return to the previous state"
 run = ["git", "rebase", "--abort"]
 
 [recipe.git-rebase-abort.annotations]
+title = "Abort Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -255,6 +276,7 @@ description = "Push the current branch to origin, setting upstream if needed"
 run = ["git", "push", "--set-upstream", "origin", "HEAD"]
 
 [recipe.git-push.annotations]
+title = "Push"
 read_only = false
 destructive = false
 idempotent = true
@@ -265,6 +287,7 @@ description = "Force-push the current branch, overwriting remote history"
 run = ["git", "push", "--force-with-lease", "origin", "HEAD"]
 
 [recipe.git-push-force.annotations]
+title = "Force Push"
 read_only = false
 destructive = true
 idempotent = true
@@ -281,6 +304,7 @@ help = "PR title"
 help = "PR description"
 
 [recipe.gh-pr-create.annotations]
+title = "Create Pull Request"
 read_only = false
 destructive = false
 idempotent = false
@@ -300,6 +324,7 @@ help = "new PR title"
 help = "new PR description"
 
 [recipe.gh-pr-edit.annotations]
+title = "Edit Pull Request"
 read_only = false
 destructive = false
 idempotent = true
@@ -313,6 +338,7 @@ run = ["gh", "pr", "view", "{number}", "--json", "title,body,comments,reviews"]
 help = "PR number"
 
 [recipe.gh-pr-view.annotations]
+title = "View Pull Request"
 read_only = true
 destructive = false
 idempotent = true
@@ -328,6 +354,7 @@ run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments", "--jq
 help = "PR number"
 
 [recipe.gh-pr-review-comments.annotations]
+title = "List Review Comments"
 read_only = true
 destructive = false
 idempotent = true
@@ -344,6 +371,7 @@ help = "PR number"
 help = "reply text"
 
 [recipe.gh-pr-comment.annotations]
+title = "Comment on Pull Request"
 read_only = false
 destructive = false
 idempotent = false
@@ -360,6 +388,7 @@ help = "PR number"
 help = "approval comment"
 
 [recipe.gh-pr-approve.annotations]
+title = "Approve Pull Request"
 read_only = false
 destructive = false
 idempotent = false
