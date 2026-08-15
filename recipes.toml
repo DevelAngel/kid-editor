@@ -118,7 +118,7 @@ run = ["git", "switch", "-c", "{name}"]
 help = "name of the new branch"
 
 [recipe.git-branch.annotations]
-title = "Create Branch"
+title = "Git Create Branch"
 read_only = false
 destructive = false
 idempotent = false
@@ -132,7 +132,7 @@ run = ["git", "switch", "{name}"]
 help = "name of the branch to switch to"
 
 [recipe.git-switch.annotations]
-title = "Switch Branch"
+title = "Git Switch Branch"
 read_only = false
 destructive = false
 idempotent = true
@@ -157,7 +157,7 @@ run = ["git", "add", "{path}"]
 help = "file or directory to stage"
 
 [recipe.git-add.annotations]
-title = "Stage File"
+title = "Git Stage File"
 read_only = false
 destructive = false
 idempotent = true
@@ -174,7 +174,7 @@ help = "current path of the tracked file"
 help = "new path for the file"
 
 [recipe.git-mv.annotations]
-title = "Move File"
+title = "Git Move File"
 read_only = false
 destructive = false
 idempotent = false
@@ -188,7 +188,7 @@ run = ["git", "rm", "{path}"]
 help = "file or directory to remove"
 
 [recipe.git-rm.annotations]
-title = "Remove File"
+title = "Git Remove File"
 read_only = false
 destructive = true
 idempotent = false
@@ -202,7 +202,7 @@ run = ["git", "restore", "--staged", "{path}"]
 help = "file or directory to unstage"
 
 [recipe.git-restore.annotations]
-title = "Unstage File"
+title = "Git Unstage File"
 read_only = false
 destructive = false
 idempotent = true
@@ -213,7 +213,7 @@ description = "Undo the last commit, keeping its changes staged"
 run = ["git", "reset", "--soft", "HEAD~1"]
 
 [recipe.git-reset-soft.annotations]
-title = "Undo Last Commit"
+title = "Git Undo Last Commit"
 read_only = false
 destructive = true
 idempotent = false
@@ -229,7 +229,7 @@ run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de
 help = "commit message"
 
 [recipe.git-commit.annotations]
-title = "Commit"
+title = "Git Commit"
 read_only = false
 destructive = false
 idempotent = false
@@ -243,7 +243,7 @@ run = ["git", "rebase", "{target}"]
 help = "branch or commit to rebase onto"
 
 [recipe.git-rebase.annotations]
-title = "Rebase"
+title = "Git Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -254,7 +254,7 @@ description = "Continue a rebase after fixing a conflict"
 run = ["git", "rebase", "--continue"]
 
 [recipe.git-rebase-continue.annotations]
-title = "Continue Rebase"
+title = "Git Continue Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -265,7 +265,7 @@ description = "Cancel an in-progress rebase and return to the previous state"
 run = ["git", "rebase", "--abort"]
 
 [recipe.git-rebase-abort.annotations]
-title = "Abort Rebase"
+title = "Git Abort Rebase"
 read_only = false
 destructive = true
 idempotent = false
@@ -276,7 +276,7 @@ description = "Push the current branch to origin, setting upstream if needed"
 run = ["git", "push", "--set-upstream", "origin", "HEAD"]
 
 [recipe.git-push.annotations]
-title = "Push"
+title = "Git Push"
 read_only = false
 destructive = false
 idempotent = true
@@ -287,7 +287,7 @@ description = "Force-push the current branch, overwriting remote history"
 run = ["git", "push", "--force-with-lease", "origin", "HEAD"]
 
 [recipe.git-push-force.annotations]
-title = "Force Push"
+title = "Git Force Push"
 read_only = false
 destructive = true
 idempotent = true
