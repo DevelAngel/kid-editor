@@ -110,7 +110,7 @@ fn build_cli(file: &'static RecipeFile) -> Command {
         run_cmd = run_cmd.subcommand(sub);
     }
 
-    Command::new("recipe")
+    Command::new("kid-recipes")
         .version(env!("CARGO_PKG_VERSION"))
         .about(
             "Runs recipes declared in a `recipes.toml` file — a minimal, \
