@@ -19,6 +19,7 @@ name = "kid-recipes"
 path = "src/main.rs"
 
 [dependencies]
+anyhow.workspace = true
 clap.workspace = true
 indexmap = { workspace = true, features = ["serde"] }
 serde.workspace = true
