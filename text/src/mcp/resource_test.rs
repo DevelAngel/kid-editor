@@ -79,23 +79,30 @@ pub(super) fn is_counter(uri: &str) -> bool {
     uri == COUNTER_URI
 }
 
-/// `Stop`/`Start { interval_secs }` as one enum instead of two tools —
-/// a single control surface for the one thing being toggled. Nested
-/// inside `TimerControlInput` rather than used directly as the tool's
-/// root parameter: an internally tagged enum's own schema is a `oneOf`
-/// with no root `type: object`, which the MCP spec requires of a
-/// tool's input schema. Nesting it as a field sidesteps that — the
-/// root schema is `TimerControlInput`'s (an object), not the enum's.
+/// Flat `action` + optional `interval_secs` instead of an internally
+/// tagged `Start`/`Stop` enum: an internally tagged enum's JSON schema
+/// is a bare `oneOf` with no `type: object` on the enum itself, even
+/// nested one field deep inside an object wrapper. Clients that build
+/// their tool-call form from the schema can't render a `oneOf` field
+/// and fall back to serializing it as a raw JSON string, which then
+/// fails to deserialize server-side. Two flat properties keep the
+/// whole schema a single `type: object` renderable by any client, at
+/// the cost of moving the "interval_secs required when starting"
+/// invariant from the type system into the handler.
 #[derive(Debug, Deserialize, JsonSchema)]
-#[serde(tag = "action")]
-enum TimerCommand {
-    Stop,
-    Start { interval_secs: u64 },
+struct TimerControlInput {
+    action: TimerAction,
+    /// Tick interval in seconds. Required when `action` is `start`,
+    /// ignored when `stop`.
+    #[serde(default)]
+    interval_secs: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-struct TimerControlInput {
-    command: TimerCommand,
+#[serde(rename_all = "lowercase")]
+enum TimerAction {
+    Start,
+    Stop,
 }
 
 #[tool_router(router = resource_test_tool_router, vis = "pub(super)")]
@@ -119,9 +126,15 @@ impl McpService {
             cancel.cancel();
         }
 
-        let message = match input.command {
-            TimerCommand::Stop => "timer stopped".to_owned(),
-            TimerCommand::Start { interval_secs } => {
+        let message = match input.action {
+            TimerAction::Stop => "timer stopped".to_owned(),
+            TimerAction::Start => {
+                let Some(interval_secs) = input.interval_secs else {
+                    return Err(McpError::invalid_params(
+                        "interval_secs is required when action is \"start\"",
+                        None,
+                    ));
+                };
                 let cancel = CancellationToken::new();
                 state.cancel = Some(cancel.clone());
                 spawn_ticker(
