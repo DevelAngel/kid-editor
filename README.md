@@ -46,7 +46,9 @@ look around, read closely, change precisely.
   not a silent match against text that's no longer there.
 - `fs_insert_lines`, `fs_remove_lines`, and `fs_replace_lines` address by line number instead of by exact text,
   negative numbers counting from the end like `tail`.
-- `fs_create` writes a new file, or overwrites an old one, on purpose.
+- `fs_create` writes a brand-new file. It refuses to touch a path that already exists —
+  overwriting a large file by accident is exactly the kind of silent, expensive mistake
+  the line-addressed tools above exist to avoid; edit an existing file with those instead.
 
 A small, deliberate set of tools. Not fifty.
 That's not an accident — it's the whole design philosophy, stated as a list.
