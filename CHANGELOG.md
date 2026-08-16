@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.10.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.9.0..v0.10.0) - 2026-08-16
+
+### Bug Fixes
+
+- **(recipe)** restore real per-recipe --help via mut_subcommand - ([e82f85b](https://github.com/DevelAngel/matrix-mcp/commit/e82f85b7c5c539992a1545057edad79469c14720)) - Angelos Drossos
+- **(recipes)** prefix all git recipe titles with "Git" - ([efb63c4](https://github.com/DevelAngel/matrix-mcp/commit/efb63c44ec961ce338ff4020779fdb650f4df792)) - Angelos Drossos
+
+### Build
+
+- **(recipe)** [**breaking**] rename binary to kid-recipes - ([716d30b](https://github.com/DevelAngel/matrix-mcp/commit/716d30b43da82d476d91e6efa093b5c41f47623d)) - Angelos Drossos
+- **(recipes)** prefix rust recipes - ([2a98428](https://github.com/DevelAngel/matrix-mcp/commit/2a98428829078ffc33606b7401b5c6acaaef948d)) - ”Navi-KID”
+- update dependencies - ([738745b](https://github.com/DevelAngel/matrix-mcp/commit/738745b91db98af819b452c019a327d7aecfe5d6)) - ”Navi-KID”
+
+### Documentation
+
+- improve README - ([1cdf253](https://github.com/DevelAngel/matrix-mcp/commit/1cdf253120dd2538ec04dfc99097055a298e102d)) - Angelos Drossos
+
+### Features
+
+- **(recipe)** [**breaking**] switch CLI to clap builder API - ([2f9a7f2](https://github.com/DevelAngel/matrix-mcp/commit/2f9a7f2e3c7a4a1d89b9de159dab150a205e13d6)) - Angelos Drossos
+- **(recipe)** [**breaking**] drop list, run --help already enumerates recipes - ([8a553c0](https://github.com/DevelAngel/matrix-mcp/commit/8a553c0de8e77b03c96eabd21bfe867b0ede301f)) - Angelos Drossos
+- **(recipe)** [**breaking**] drop run prefix, recipes are top-level subcommands - ([513394d](https://github.com/DevelAngel/matrix-mcp/commit/513394d5ece10f5ca5d03ec1787648113a6dabf1)) - Angelos Drossos
+- **(recipe)** resolve --file/--cwd via clap, not manual scanning - ([aba4411](https://github.com/DevelAngel/matrix-mcp/commit/aba4411bf4a0954c48f29ca3a17142a5fd06d183)) - Angelos Drossos
+- **(recipes)** add tool titles to recipes.toml - ([2e0fb8e](https://github.com/DevelAngel/matrix-mcp/commit/2e0fb8e3aa1bf0775bf3e3b6193fb7b0a8b0f389)) - Angelos Drossos
+
+### Refactoring
+
+- **(recipe)** back CLI with derive API, keep builder minimal - ([ffe1189](https://github.com/DevelAngel/matrix-mcp/commit/ffe1189fe7dde9026eaa9f14cadda82a41213a3a)) - Angelos Drossos
+- **(recipe)** start from Cli::parse(), drop manual pre-scan - ([10e197e](https://github.com/DevelAngel/matrix-mcp/commit/10e197e5bb9c867e376bcd0d09f75ac62fcb2432)) - Angelos Drossos
+- **(recipe)** use anyhow for our own error paths - ([d19c1f7](https://github.com/DevelAngel/matrix-mcp/commit/d19c1f7bd457c7bb3ad6c64c57f7208e06d5a1ab)) - Angelos Drossos
+- **(recipe)** main returns Result<()> directly - ([c347f0c](https://github.com/DevelAngel/matrix-mcp/commit/c347f0cd3bd741694c99c11fc577796d49f43b87)) - Angelos Drossos
+- **(recipe)** augment_with_recipes as a Command extension trait - ([a7abe91](https://github.com/DevelAngel/matrix-mcp/commit/a7abe91e900d338ca63fe37f77769f84eaa56e10)) - Angelos Drossos
+
+### Style
+
+- **(recipe)** unqualify process::exit, note Result<!> is unstable - ([aeb24b9](https://github.com/DevelAngel/matrix-mcp/commit/aeb24b97cc8956e50030926072b1c74313dbfa79)) - Angelos Drossos
+- **(recipe)** trim AugmentWithRecipes doc comments - ([50b3baf](https://github.com/DevelAngel/matrix-mcp/commit/50b3bafe03e0642032b3e3e193a899ab2a125ad5)) - Angelos Drossos
+
+### Tests
+
+- **(recipe-run)** fix renamed recipe names in sanity test - ([b6ea567](https://github.com/DevelAngel/matrix-mcp/commit/b6ea567d80f09a00f6d5aa345e26c69a068b62bb)) - Angelos Drossos
+
 ## [0.9.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.8.0..v0.9.0) - 2026-08-14
 
 ### Bug Fixes
