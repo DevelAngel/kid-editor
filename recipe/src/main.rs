@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     }
     let file = RecipeFile::load(&cli.file)
         .context(format!("failed to load recipe file {}", cli.file.display()))?;
-    let matches = augment_with_recipes(Cli::command(), &file).get_matches();
+    let matches = Cli::command().augment_with_recipes(&file).get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
     let cwd = cli
@@ -49,33 +49,44 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Appends one subcommand per declared recipe, with `--<param>` flags
-/// generated from that recipe's own `args` map (name, `help` text, and
-/// `about` from the recipe's `description` included — `--help` doubles as
-/// the recipe listing, so there's no separate `list` command). This is
-/// the one part of the CLI that can't come from derive: recipe names and
-/// their parameters are runtime data, only known once `recipes.toml` is
-/// loaded. Everything else — `--file`, `--cwd` — stays declared on `Cli`
-/// above and is read back through `Cli::from_arg_matches`.
-fn augment_with_recipes(cli: Command, file: &RecipeFile) -> Command {
-    let mut cli = cli.subcommand_required(true).arg_required_else_help(true);
-    for (name, recipe) in file.iter() {
-        let mut sub = Command::new(name.as_str().to_owned());
-        if !recipe.description.is_empty() {
-            sub = sub.about(recipe.description.clone());
-        }
-        for (arg_name, arg) in &recipe.args {
-            let mut a = Arg::new(arg_name.clone())
-                .long(arg_name.clone())
-                .required(true);
-            if !arg.help.is_empty() {
-                a = a.help(arg.help.clone());
+/// Extension trait so `augment_with_recipes` reads as part of the same
+/// fluent builder chain as clap's own `Command` methods
+/// (`Cli::command().augment_with_recipes(&file)`), the way `clap::Args`
+/// extends `Command` with `augment_args`.
+trait AugmentWithRecipes {
+    /// Appends one subcommand per declared recipe, with `--<param>` flags
+    /// generated from that recipe's own `args` map (name, `help` text,
+    /// and `about` from the recipe's `description` included — `--help`
+    /// doubles as the recipe listing, so there's no separate `list`
+    /// command). This is the one part of the CLI that can't come from
+    /// derive: recipe names and their parameters are runtime data, only
+    /// known once `recipes.toml` is loaded. Everything else — `--file`,
+    /// `--cwd` — stays declared on `Cli` and is read back through
+    /// `Cli::from_arg_matches`.
+    fn augment_with_recipes(self, file: &RecipeFile) -> Self;
+}
+
+impl AugmentWithRecipes for Command {
+    fn augment_with_recipes(self, file: &RecipeFile) -> Self {
+        let mut cli = self.subcommand_required(true).arg_required_else_help(true);
+        for (name, recipe) in file.iter() {
+            let mut sub = Command::new(name.as_str().to_owned());
+            if !recipe.description.is_empty() {
+                sub = sub.about(recipe.description.clone());
             }
-            sub = sub.arg(a);
+            for (arg_name, arg) in &recipe.args {
+                let mut a = Arg::new(arg_name.clone())
+                    .long(arg_name.clone())
+                    .required(true);
+                if !arg.help.is_empty() {
+                    a = a.help(arg.help.clone());
+                }
+                sub = sub.arg(a);
+            }
+            cli = cli.subcommand(sub);
         }
-        cli = cli.subcommand(sub);
+        cli
     }
-    cli
 }
 
 fn run(file: &RecipeFile, name: &str, matches: &ArgMatches, cwd: &Path) -> Result<()> {
