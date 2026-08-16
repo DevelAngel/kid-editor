@@ -13,14 +13,14 @@ use std::io::Write;
 #[derive(Debug, Deserialize, JsonSchema)]
 struct CreateInput {
     path: UnresolvedPath,
-    /// Full file content. Rejected if the file already exists.
+    /// Full file content.
     file_text: String,
 }
 
 #[tool_router(router = create_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
-        description = "Create a new file with the given content. Fails if the path already exists — use fs_replace_lines, fs_insert_lines, or fs_remove_lines to edit an existing file.",
+        description = "Create a new file with the given content. Fails if the path already exists",
         annotations(
             title = "Create File",
             read_only_hint = false,
