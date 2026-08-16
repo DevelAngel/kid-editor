@@ -7,18 +7,13 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process;
 
-/// Single source of truth for `--file`'s default, referenced both by
-/// `Cli`'s derive attribute and by `preparse_file_arg` (which needs a
-/// fallback before `Cli` itself can be built — see below).
-const DEFAULT_RECIPE_FILE: &str = "recipes.toml";
-
 /// Runs recipes declared in a `recipes.toml` file — a minimal, shell-free
 /// alternative to `just`.
 #[derive(Parser, Debug)]
 #[command(name = "kid-recipes", version)]
 struct Cli {
     /// Path to the recipe file.
-    #[arg(long, default_value = DEFAULT_RECIPE_FILE, value_hint = ValueHint::FilePath)]
+    #[arg(long, default_value = "recipes.toml", value_hint = ValueHint::FilePath)]
     file: PathBuf,
 
     /// Directory the recipe runs in. Defaults to the current working
@@ -28,9 +23,19 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-    let file_path = preparse_file_arg(&env::args().collect::<Vec<_>>());
-    let file = RecipeFile::load(&file_path).context("failed to load recipe file")?;
-
+    let cli = {
+        let cli = Cli::command().disable_help_flag(true).ignore_errors(true);
+        Cli::from_arg_matches(&cli.get_matches()).unwrap_or_else(|e| e.exit())
+    };
+    if !cli.file.exists() {
+        let cli = Cli::command()
+            .subcommand_required(true)
+            .arg_required_else_help(true)
+            .subcommand(Command::new("...").about("Commands from recipe file"));
+        Cli::from_arg_matches(&cli.get_matches())?;
+    }
+    let file = RecipeFile::load(&cli.file)
+        .context(format!("failed to load recipe file {}", cli.file.display()))?;
     let matches = augment_with_recipes(Cli::command(), &file).get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
@@ -42,47 +47,6 @@ fn main() -> Result<()> {
     };
     run(&file, name, recipe_matches, &cwd)?;
     Ok(())
-}
-
-/// Scans argv for `--file`/`--file=VALUE` occurring before the recipe-name
-/// token. Must run before the recipe file is loaded, since
-/// `augment_with_recipes` needs that file to generate one subcommand per
-/// recipe — the entire reason this CLI can't just call `Cli::parse()`
-/// directly.
-///
-/// Recipe names aren't known yet at this point (that's the whole
-/// problem), so the scan can't match on a fixed subcommand token like
-/// `run` anymore — it stops at the first token that isn't `--file`, its
-/// value, or some other flag (anything starting with `-`), on the
-/// assumption that recipe names themselves don't start with `-`. A
-/// `--file` appearing after the recipe name belongs to that recipe's own
-/// generated flags (a recipe may itself declare a parameter named
-/// `file`), not to this one — stopping the scan at that boundary keeps
-/// the distinction intact, matching clap's own non-global-arg scoping
-/// rather than special-casing it. `--cwd`'s value is skipped the same
-/// way, purely so it doesn't get mistaken for the recipe name; its
-/// actual value is read later, by the real parse.
-fn preparse_file_arg(args: &[String]) -> PathBuf {
-    let mut file = PathBuf::from(DEFAULT_RECIPE_FILE);
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--file" => {
-                if let Some(value) = iter.next() {
-                    file = PathBuf::from(value);
-                }
-            }
-            "--cwd" => {
-                iter.next();
-            }
-            arg if arg.starts_with("--file=") => {
-                file = PathBuf::from(&arg["--file=".len()..]);
-            }
-            arg if arg.starts_with('-') => {}
-            _ => break,
-        }
-    }
-    file
 }
 
 /// Appends one subcommand per declared recipe, with `--<param>` flags
