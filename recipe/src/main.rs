@@ -1,9 +1,7 @@
 use recipe::{RecipeFile, RecipeName};
 
 use anyhow::{Context, Result};
-use clap::{
-    Arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
-};
+use clap::{Arg, ArgMatches, Command, CommandFactory, FromArgMatches, Parser, ValueHint};
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -23,19 +21,10 @@ struct Cli {
     #[arg(long, default_value = DEFAULT_RECIPE_FILE, value_hint = ValueHint::FilePath)]
     file: PathBuf,
 
-    #[command(subcommand)]
-    command: TopCommand,
-}
-
-#[derive(Subcommand, Debug)]
-enum TopCommand {
-    /// Run one recipe by name.
-    Run {
-        /// Directory the recipe runs in. Defaults to the current working
-        /// directory.
-        #[arg(long, value_hint = ValueHint::DirPath)]
-        cwd: Option<PathBuf>,
-    },
+    /// Directory the recipe runs in. Defaults to the current working
+    /// directory.
+    #[arg(long, value_hint = ValueHint::DirPath)]
+    cwd: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -45,82 +34,84 @@ fn main() -> Result<()> {
     let matches = augment_with_recipes(Cli::command(), &file).get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
-    let TopCommand::Run { cwd } = cli.command;
-    let cwd = cwd.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let Some((name, recipe_matches)) = matches
-        .subcommand_matches("run")
-        .and_then(ArgMatches::subcommand)
-    else {
-        unreachable!("`augment_with_recipes` sets subcommand_required(true) on `run`");
+    let cwd = cli
+        .cwd
+        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let Some((name, recipe_matches)) = matches.subcommand() else {
+        unreachable!("`augment_with_recipes` sets subcommand_required(true)");
     };
     run(&file, name, recipe_matches, &cwd)?;
     Ok(())
 }
 
-/// Scans argv for a top-level `--file`/`--file=VALUE` occurring before the
-/// `run` subcommand token. Must run before the recipe file is loaded,
-/// since `augment_with_recipes` needs that file to generate per-recipe
-/// subcommands and their `--<param>` flags — the entire reason this CLI
-/// can't just call `Cli::parse()` directly.
+/// Scans argv for `--file`/`--file=VALUE` occurring before the recipe-name
+/// token. Must run before the recipe file is loaded, since
+/// `augment_with_recipes` needs that file to generate one subcommand per
+/// recipe — the entire reason this CLI can't just call `Cli::parse()`
+/// directly.
 ///
-/// A `--file` appearing after `run <recipe-name>` belongs to that
-/// recipe's own generated flags (a recipe may itself declare a parameter
-/// named `file`), not to this one — stopping the scan at the subcommand
-/// token keeps that distinction intact, matching clap's own
-/// non-global-arg scoping rather than special-casing it.
+/// Recipe names aren't known yet at this point (that's the whole
+/// problem), so the scan can't match on a fixed subcommand token like
+/// `run` anymore — it stops at the first token that isn't `--file`, its
+/// value, or some other flag (anything starting with `-`), on the
+/// assumption that recipe names themselves don't start with `-`. A
+/// `--file` appearing after the recipe name belongs to that recipe's own
+/// generated flags (a recipe may itself declare a parameter named
+/// `file`), not to this one — stopping the scan at that boundary keeps
+/// the distinction intact, matching clap's own non-global-arg scoping
+/// rather than special-casing it. `--cwd`'s value is skipped the same
+/// way, purely so it doesn't get mistaken for the recipe name; its
+/// actual value is read later, by the real parse.
 fn preparse_file_arg(args: &[String]) -> PathBuf {
     let mut file = PathBuf::from(DEFAULT_RECIPE_FILE);
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "run" => break,
             "--file" => {
                 if let Some(value) = iter.next() {
                     file = PathBuf::from(value);
                 }
             }
-            arg => {
-                if let Some(value) = arg.strip_prefix("--file=") {
-                    file = PathBuf::from(value);
-                }
+            "--cwd" => {
+                iter.next();
             }
+            arg if arg.starts_with("--file=") => {
+                file = PathBuf::from(&arg["--file=".len()..]);
+            }
+            arg if arg.starts_with('-') => {}
+            _ => break,
         }
     }
     file
 }
 
-/// Appends one subcommand per declared recipe under `run`, with
-/// `--<param>` flags generated from that recipe's own `args` map (name,
-/// `help` text, and `about` from the recipe's `description` included —
-/// `run --help` doubles as the recipe listing, so there's no separate
-/// `list` command). This is the one part of the CLI that can't come from
-/// derive: recipe names and their parameters are runtime data, only
-/// known once `recipes.toml` is loaded. Everything else — `--file`,
-/// `run --cwd` — stays declared on `Cli`/`TopCommand` above and is read
-/// back through `Cli::from_arg_matches`.
+/// Appends one subcommand per declared recipe, with `--<param>` flags
+/// generated from that recipe's own `args` map (name, `help` text, and
+/// `about` from the recipe's `description` included — `--help` doubles as
+/// the recipe listing, so there's no separate `list` command). This is
+/// the one part of the CLI that can't come from derive: recipe names and
+/// their parameters are runtime data, only known once `recipes.toml` is
+/// loaded. Everything else — `--file`, `--cwd` — stays declared on `Cli`
+/// above and is read back through `Cli::from_arg_matches`.
 fn augment_with_recipes(cli: Command, file: &RecipeFile) -> Command {
-    cli.mut_subcommand("run", |run_cmd| {
-        let mut run_cmd = run_cmd
-            .subcommand_required(true)
-            .arg_required_else_help(true);
-        for (name, recipe) in file.iter() {
-            let mut sub = Command::new(name.as_str().to_owned());
-            if !recipe.description.is_empty() {
-                sub = sub.about(recipe.description.clone());
-            }
-            for (arg_name, arg) in &recipe.args {
-                let mut a = Arg::new(arg_name.clone())
-                    .long(arg_name.clone())
-                    .required(true);
-                if !arg.help.is_empty() {
-                    a = a.help(arg.help.clone());
-                }
-                sub = sub.arg(a);
-            }
-            run_cmd = run_cmd.subcommand(sub);
+    let mut cli = cli.subcommand_required(true).arg_required_else_help(true);
+    for (name, recipe) in file.iter() {
+        let mut sub = Command::new(name.as_str().to_owned());
+        if !recipe.description.is_empty() {
+            sub = sub.about(recipe.description.clone());
         }
-        run_cmd
-    })
+        for (arg_name, arg) in &recipe.args {
+            let mut a = Arg::new(arg_name.clone())
+                .long(arg_name.clone())
+                .required(true);
+            if !arg.help.is_empty() {
+                a = a.help(arg.help.clone());
+            }
+            sub = sub.arg(a);
+        }
+        cli = cli.subcommand(sub);
+    }
+    cli
 }
 
 fn run(file: &RecipeFile, name: &str, matches: &ArgMatches, cwd: &Path) -> Result<()> {
