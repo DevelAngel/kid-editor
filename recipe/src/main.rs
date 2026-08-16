@@ -51,18 +51,13 @@ fn main() -> Result<()> {
 
 /// Extension trait so `augment_with_recipes` reads as part of the same
 /// fluent builder chain as clap's own `Command` methods
-/// (`Cli::command().augment_with_recipes(&file)`), the way `clap::Args`
-/// extends `Command` with `augment_args`.
+/// (`Cli::command().augment_with_recipes(&file)`).
 trait AugmentWithRecipes {
     /// Appends one subcommand per declared recipe, with `--<param>` flags
-    /// generated from that recipe's own `args` map (name, `help` text,
-    /// and `about` from the recipe's `description` included — `--help`
-    /// doubles as the recipe listing, so there's no separate `list`
-    /// command). This is the one part of the CLI that can't come from
-    /// derive: recipe names and their parameters are runtime data, only
-    /// known once `recipes.toml` is loaded. Everything else — `--file`,
-    /// `--cwd` — stays declared on `Cli` and is read back through
-    /// `Cli::from_arg_matches`.
+    /// generated from that recipe's own `args` map — the one part of the
+    /// CLI that can't come from derive, since recipe names and their
+    /// parameters are runtime data, only known once `recipes.toml` is
+    /// loaded.
     fn augment_with_recipes(self, file: &RecipeFile) -> Self;
 }
 
