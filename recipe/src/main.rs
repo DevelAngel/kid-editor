@@ -29,8 +29,6 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum TopCommand {
-    /// List every recipe this file declares.
-    List,
     /// Run one recipe by name.
     Run {
         /// Directory the recipe runs in. Defaults to the current working
@@ -47,28 +45,23 @@ fn main() -> Result<()> {
     let matches = augment_with_recipes(Cli::command(), &file).get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
 
-    match cli.command {
-        TopCommand::List => list(&file),
-        TopCommand::Run { cwd } => {
-            let cwd =
-                cwd.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-            let Some((name, recipe_matches)) = matches
-                .subcommand_matches("run")
-                .and_then(ArgMatches::subcommand)
-            else {
-                unreachable!("`augment_with_recipes` sets subcommand_required(true) on `run`");
-            };
-            run(&file, name, recipe_matches, &cwd)?;
-        }
-    }
+    let TopCommand::Run { cwd } = cli.command;
+    let cwd = cwd.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let Some((name, recipe_matches)) = matches
+        .subcommand_matches("run")
+        .and_then(ArgMatches::subcommand)
+    else {
+        unreachable!("`augment_with_recipes` sets subcommand_required(true) on `run`");
+    };
+    run(&file, name, recipe_matches, &cwd)?;
     Ok(())
 }
 
 /// Scans argv for a top-level `--file`/`--file=VALUE` occurring before the
-/// first subcommand token (`list` or `run`). Must run before the recipe
-/// file is loaded, since `augment_with_recipes` needs that file to
-/// generate per-recipe subcommands and their `--<param>` flags — the
-/// entire reason this CLI can't just call `Cli::parse()` directly.
+/// `run` subcommand token. Must run before the recipe file is loaded,
+/// since `augment_with_recipes` needs that file to generate per-recipe
+/// subcommands and their `--<param>` flags — the entire reason this CLI
+/// can't just call `Cli::parse()` directly.
 ///
 /// A `--file` appearing after `run <recipe-name>` belongs to that
 /// recipe's own generated flags (a recipe may itself declare a parameter
@@ -80,7 +73,7 @@ fn preparse_file_arg(args: &[String]) -> PathBuf {
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "list" | "run" => break,
+            "run" => break,
             "--file" => {
                 if let Some(value) = iter.next() {
                     file = PathBuf::from(value);
@@ -97,12 +90,14 @@ fn preparse_file_arg(args: &[String]) -> PathBuf {
 }
 
 /// Appends one subcommand per declared recipe under `run`, with
-/// `--<param>` flags generated from that recipe's own `args` map (name
-/// and `help` text included). This is the one part of the CLI that can't
-/// come from derive: recipe names and their parameters are runtime data,
-/// only known once `recipes.toml` is loaded. Everything else — `--file`,
-/// `list`, `run --cwd` — stays declared on `Cli`/`TopCommand` above and
-/// is read back through `Cli::from_arg_matches`.
+/// `--<param>` flags generated from that recipe's own `args` map (name,
+/// `help` text, and `about` from the recipe's `description` included —
+/// `run --help` doubles as the recipe listing, so there's no separate
+/// `list` command). This is the one part of the CLI that can't come from
+/// derive: recipe names and their parameters are runtime data, only
+/// known once `recipes.toml` is loaded. Everything else — `--file`,
+/// `run --cwd` — stays declared on `Cli`/`TopCommand` above and is read
+/// back through `Cli::from_arg_matches`.
 fn augment_with_recipes(cli: Command, file: &RecipeFile) -> Command {
     cli.mut_subcommand("run", |run_cmd| {
         let mut run_cmd = run_cmd
@@ -126,24 +121,6 @@ fn augment_with_recipes(cli: Command, file: &RecipeFile) -> Command {
         }
         run_cmd
     })
-}
-
-fn list(file: &RecipeFile) {
-    for (name, recipe) in file.iter() {
-        let params = recipe
-            .args
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-            .join(" ");
-        match params.as_str() {
-            "" => println!("{name}"),
-            params => println!("{name} {params}"),
-        }
-        if !recipe.description.is_empty() {
-            println!("    {}", recipe.description);
-        }
-    }
 }
 
 fn run(file: &RecipeFile, name: &str, matches: &ArgMatches, cwd: &Path) -> Result<()> {
