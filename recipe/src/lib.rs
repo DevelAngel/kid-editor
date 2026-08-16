@@ -174,13 +174,7 @@ pub struct RecipeFile {
 }
 
 impl RecipeFile {
-    /// Empty file if `path` doesn't exist — same convention as the
-    /// `just`-based discovery this replaces: no recipe file means no
-    /// recipes, not an error.
     pub fn load(path: &Path) -> Result<Self, LoadError> {
-        if !path.is_file() {
-            return Ok(Self::default());
-        }
         let text = std::fs::read_to_string(path).map_err(LoadError::Read)?;
         toml::from_str(&text).map_err(LoadError::Parse)
     }
@@ -257,13 +251,6 @@ mod tests {
         let recipe = file.get(&RecipeName("test-one".to_owned())).unwrap();
         assert_eq!(recipe.args.keys().collect::<Vec<_>>(), vec!["name"]);
         assert_eq!(recipe.args["name"].help, "test name to run");
-    }
-
-    #[test]
-    fn load_returns_empty_file_when_missing() {
-        let root = assert_fs::TempDir::new().unwrap();
-        let file = RecipeFile::load(&root.path().join("recipes.toml")).unwrap();
-        assert!(file.is_empty());
     }
 
     #[test]
