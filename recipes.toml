@@ -8,13 +8,15 @@
 # array directly if a specific extra flag turns out to be needed
 # regularly, rather than reopening free-form argument passthrough.
 
+# --- Rust ---
+
 [recipe.rust-check]
 description = "Check that the whole project still compiles, including tests"
 run = ["cargo", "check", "--all-targets"]
 
 [recipe.rust-check.annotations]
-title = "Check"
-read_only = false
+title = "Rust Check"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
@@ -24,8 +26,8 @@ description = "Run the linter (Clippy) and report style/correctness issues"
 run = ["cargo", "clippy"]
 
 [recipe.rust-lint.annotations]
-title = "Lint"
-read_only = false
+title = "Rust Lint"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
@@ -35,8 +37,8 @@ description = "Run the full test suite"
 run = ["cargo", "test"]
 
 [recipe.rust-test.annotations]
-title = "Test"
-read_only = false
+title = "Rust Test"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
@@ -49,8 +51,8 @@ run = ["cargo", "test", "--", "{name}"]
 help = "name of the test to run"
 
 [recipe.rust-test-one.annotations]
-title = "Test One"
-read_only = false
+title = "Rust Test One"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
@@ -60,8 +62,8 @@ description = "Build the project with debug symbols"
 run = ["cargo", "build"]
 
 [recipe.rust-build-debug.annotations]
-title = "Build (Debug)"
-read_only = false
+title = "Rust Build (Debug)"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
@@ -71,11 +73,13 @@ description = "Build an optimized release binary"
 run = ["cargo", "build", "--release", "--locked"]
 
 [recipe.rust-build-release.annotations]
-title = "Build (Release)"
-read_only = false
+title = "Rust Build (Release)"
+read_only = true
 destructive = false
 idempotent = true
 open_world = false
+
+# --- Git ---
 
 [recipe.git-status]
 description = "Show which files have uncommitted changes"
@@ -293,6 +297,8 @@ destructive = true
 idempotent = true
 open_world = true
 
+# --- GitHub ---
+
 [recipe.gh-pr-create]
 description = "Open a pull request for the current branch. Write the body per the code-review-request-writing-guide skill (TL;DR, Why/What/How, Breaking changes)."
 run = ["gh", "pr", "create", "--title", "{title}", "--body", "{body}", "--base", "main"]
@@ -345,10 +351,8 @@ idempotent = true
 open_world = true
 
 [recipe.gh-pr-review-comments]
-description = "List inline review comments on a PR"
-# TODO: adapt the hardcoded repos/DevelAngel/kid-editor path below when
-# reusing this recipes.toml for a different repository.
-run = ["gh", "api", "repos/DevelAngel/kid-editor/pulls/{number}/comments", "--jq", "[.[] | {id, path, line, author: .user.login, body}]"]
+description = "List unresolved, non-outdated inline review comments on a PR"
+run = ["gh", "monitor", "review", "view", "{number}", "--unresolved", "--not_outdated"]
 
 [recipe.gh-pr-review-comments.args.number]
 help = "PR number"
