@@ -9,6 +9,8 @@ precise file-editing tools, and a hard boundary around where it can use them.
 One workspace, five tools, no way out.
 Behind an OAuth 2.1 door, so only clients you've explicitly trusted get to walk through it.
 
+[![Video: KID-Text-Editor in Action](https://develangel.github.io/kid-editor/kid-text-editor.png)](https://develangel.github.io/kid-editor/kid-text-editor.mov)
+
 ## The problem
 
 Picture a model trying to fix one line in a thousand-line file.
