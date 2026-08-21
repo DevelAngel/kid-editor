@@ -35,12 +35,43 @@ impl Display for RecipeName {
     }
 }
 
+/// Whether and at what severity a parameter's value is logged by
+/// [`Recipe::log_lines`]. Independent of [`ArgKind`], which only affects
+/// formatting, not visibility.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArgLogLevel {
+    #[default]
+    Hidden,
+    Debug,
+    Info,
+}
+
+/// Formatting hint for a parameter's value when logged. `Value` (the
+/// default) renders as `name=value` on one line. `Path` renders the same
+/// way, plus a best-effort workspace-membership check (see
+/// `log_lines`) — informational only, not an access decision. `Text`
+/// renders as an indented multi-line block instead, so embedded newlines
+/// show up as real line breaks rather than an escaped `\n`.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArgKind {
+    #[default]
+    Value,
+    Path,
+    Text,
+}
+
 /// One named parameter a recipe accepts, substituted into `run` at the
 /// placeholder `{name}`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 pub struct RecipeArg {
     #[serde(default)]
     pub help: String,
+    #[serde(default)]
+    pub level: ArgLogLevel,
+    #[serde(default, rename = "type")]
+    pub kind: ArgKind,
 }
 
 /// MCP `ToolAnnotations` hints for a recipe's generated tool — unset
@@ -115,6 +146,123 @@ impl Recipe {
                 source,
             })
     }
+
+    /// Builds one log line per severity actually used among this
+    /// recipe's `level`-tagged args, in this recipe's own parameter
+    /// order. Almost always zero or one line; a recipe mixing `debug`
+    /// and `info` args produces both, kept separate so each line keeps
+    /// its own severity rather than being merged under the wrong one.
+    /// Args left at the default `level = "hidden"` never appear.
+    ///
+    /// `workspace_root` is only used for `kind = "path"` args, to add a
+    /// best-effort "is this actually inside the workspace" note — this
+    /// is informational for the log, not an access check (see
+    /// `text`'s `workspace_path` module for the real one).
+    pub fn log_lines(
+        &self,
+        provided: &[String],
+        workspace_root: &Path,
+    ) -> Vec<(ArgLogLevel, String)> {
+        let mut debug_parts = Vec::new();
+        let mut info_parts = Vec::new();
+        for ((name, arg), value) in self.args.iter().zip(provided) {
+            let formatted = match arg.level {
+                ArgLogLevel::Hidden => continue,
+                ArgLogLevel::Debug | ArgLogLevel::Info => {
+                    format_arg(name, arg.kind, value, workspace_root)
+                }
+            };
+            match arg.level {
+                ArgLogLevel::Debug => debug_parts.push(formatted),
+                ArgLogLevel::Info => info_parts.push(formatted),
+                ArgLogLevel::Hidden => unreachable!("filtered out above"),
+            }
+        }
+
+        [
+            (ArgLogLevel::Debug, debug_parts),
+            (ArgLogLevel::Info, info_parts),
+        ]
+        .into_iter()
+        .filter(|(_, parts)| !parts.is_empty())
+        .map(|(level, parts)| (level, join_formatted(&parts)))
+        .collect()
+    }
+}
+
+/// One formatted parameter, pending assembly into a full log line by
+/// [`join_formatted`]. `Inline` sits on the line's shared `, `-joined
+/// segment; `Block` (from `kind = "text"`) gets its own multi-line
+/// segment so a value's embedded newlines stay real line breaks.
+enum Formatted {
+    Inline(String),
+    Block { name: String, indented: String },
+}
+
+fn format_arg(name: &str, kind: ArgKind, value: &str, workspace_root: &Path) -> Formatted {
+    match kind {
+        ArgKind::Value => Formatted::Inline(format!("{name}={value}")),
+        ArgKind::Path => Formatted::Inline(format!(
+            "{name}={value}{}",
+            path_note(value, workspace_root)
+        )),
+        ArgKind::Text => {
+            let indented = value
+                .lines()
+                .map(|line| format!("    {line}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            Formatted::Block {
+                name: name.to_owned(),
+                indented,
+            }
+        }
+    }
+}
+
+/// Best-effort, informational only — never used to grant or deny
+/// access. `value` is resolved the same way a plain filesystem path
+/// would be (absolute values are taken as-is, relative ones joined onto
+/// `workspace_root`), then canonicalized so `..`/symlinks are actually
+/// followed rather than merely inspected lexically. A path that doesn't
+/// exist yet (e.g. a `create` target) can't be canonicalized, hence
+/// "unresolved" rather than a false "outside".
+fn path_note(value: &str, workspace_root: &Path) -> &'static str {
+    let Ok(canonical_root) = workspace_root.canonicalize() else {
+        return " (unresolved)";
+    };
+    match workspace_root.join(value).canonicalize() {
+        Ok(canonical) if canonical.starts_with(&canonical_root) => "",
+        Ok(_) => " (outside workspace)",
+        Err(_) => " (unresolved)",
+    }
+}
+
+/// Joins one severity's formatted args into a single log line: all
+/// `Inline` parts share one `, `-joined segment first, then each `Block`
+/// follows as its own `name:`-headed segment.
+fn join_formatted(parts: &[Formatted]) -> String {
+    let mut segments = Vec::new();
+
+    let inline = parts
+        .iter()
+        .filter_map(|p| match p {
+            Formatted::Inline(s) => Some(s.as_str()),
+            Formatted::Block { .. } => None,
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    if !inline.is_empty() {
+        segments.push(inline);
+    }
+
+    for part in parts {
+        if let Formatted::Block { name, indented } = part {
+            segments.push(format!("{name}:\n{indented}"));
+        }
+    }
+
+    segments.join("\n")
 }
 
 /// Replaces every `{name}` occurrence in `part` with its substitution.
@@ -261,6 +409,7 @@ mod tests {
                 "name".to_owned(),
                 RecipeArg {
                     help: String::new(),
+                    ..Default::default()
                 },
             )]),
             run: vec!["echo".to_owned(), "{name}".to_owned()],
@@ -279,6 +428,7 @@ mod tests {
                 "msg".to_owned(),
                 RecipeArg {
                     help: String::new(),
+                    ..Default::default()
                 },
             )]),
             run: vec!["echo".to_owned(), "{msg}-{msg}".to_owned()],
@@ -310,6 +460,7 @@ mod tests {
                 "name".to_owned(),
                 RecipeArg {
                     help: String::new(),
+                    ..Default::default()
                 },
             )]),
             run: vec!["echo".to_owned(), "{name}".to_owned()],
@@ -338,5 +489,166 @@ mod tests {
             recipe.execute(&[], root.path()),
             Err(ExecError::EmptyRun)
         ));
+    }
+
+    fn arg(level: ArgLogLevel, kind: ArgKind) -> RecipeArg {
+        RecipeArg {
+            help: String::new(),
+            level,
+            kind,
+        }
+    }
+
+    #[test]
+    fn hidden_args_never_appear_in_log_lines() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([(
+                "secret".to_owned(),
+                arg(ArgLogLevel::Hidden, ArgKind::Value),
+            )]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        assert!(
+            recipe
+                .log_lines(&["s3cr3t".to_owned()], root.path())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn info_level_value_arg_logs_as_key_equals_value() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([("project".to_owned(), arg(ArgLogLevel::Info, ArgKind::Value))]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let lines = recipe.log_lines(&["kid-editor".to_owned()], root.path());
+        assert_eq!(
+            lines,
+            vec![(ArgLogLevel::Info, "project=kid-editor".to_owned())]
+        );
+    }
+
+    #[test]
+    fn debug_and_info_args_produce_separate_lines() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([
+                ("number".to_owned(), arg(ArgLogLevel::Info, ArgKind::Value)),
+                ("body".to_owned(), arg(ArgLogLevel::Debug, ArgKind::Value)),
+            ]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let lines = recipe.log_lines(&["42".to_owned(), "hi".to_owned()], root.path());
+        assert_eq!(
+            lines,
+            vec![
+                (ArgLogLevel::Debug, "body=hi".to_owned()),
+                (ArgLogLevel::Info, "number=42".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn text_kind_preserves_newlines_as_indented_block() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([("message".to_owned(), arg(ArgLogLevel::Info, ArgKind::Text))]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let lines = recipe.log_lines(&["line one\nline two".to_owned()], root.path());
+        assert_eq!(
+            lines,
+            vec![(
+                ArgLogLevel::Info,
+                "message:\n    line one\n    line two".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn mixing_value_and_text_kind_at_same_level_joins_inline_then_block() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([
+                ("number".to_owned(), arg(ArgLogLevel::Info, ArgKind::Value)),
+                ("body".to_owned(), arg(ArgLogLevel::Info, ArgKind::Text)),
+            ]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let lines = recipe.log_lines(&["42".to_owned(), "a\nb".to_owned()], root.path());
+        assert_eq!(
+            lines,
+            vec![(
+                ArgLogLevel::Info,
+                "number=42\nbody:\n    a\n    b".to_owned()
+            )]
+        );
+    }
+
+    #[test]
+    fn path_kind_inside_workspace_has_no_extra_note() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([("path".to_owned(), arg(ArgLogLevel::Info, ArgKind::Path))]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        std::fs::write(root.path().join("notes.md"), "hi").unwrap();
+        let lines = recipe.log_lines(&["notes.md".to_owned()], root.path());
+        assert_eq!(lines, vec![(ArgLogLevel::Info, "path=notes.md".to_owned())]);
+    }
+
+    #[test]
+    fn path_kind_outside_workspace_is_flagged() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([("path".to_owned(), arg(ArgLogLevel::Info, ArgKind::Path))]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let outside = assert_fs::TempDir::new().unwrap();
+        let outside_file = outside.path().join("secret.txt");
+        std::fs::write(&outside_file, "top secret").unwrap();
+        let lines = recipe.log_lines(&[outside_file.display().to_string()], root.path());
+        assert_eq!(
+            lines,
+            vec![(
+                ArgLogLevel::Info,
+                format!("path={} (outside workspace)", outside_file.display())
+            )]
+        );
+    }
+
+    #[test]
+    fn path_kind_nonexistent_target_is_unresolved() {
+        let recipe = Recipe {
+            description: String::new(),
+            args: IndexMap::from([("path".to_owned(), arg(ArgLogLevel::Info, ArgKind::Path))]),
+            run: vec!["echo".to_owned()],
+            annotations: RecipeAnnotations::default(),
+        };
+        let root = assert_fs::TempDir::new().unwrap();
+        let lines = recipe.log_lines(&["not-yet-created.md".to_owned()], root.path());
+        assert_eq!(
+            lines,
+            vec![(
+                ArgLogLevel::Info,
+                "path=not-yet-created.md (unresolved)".to_owned()
+            )]
+        );
     }
 }
