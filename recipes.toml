@@ -49,6 +49,7 @@ run = ["cargo", "test", "--", "{name}"]
 
 [recipe.rust-test-one.args.name]
 help = "name of the test to run"
+level = "info"
 
 [recipe.rust-test-one.annotations]
 title = "Rust Test One"
@@ -120,6 +121,7 @@ run = ["git", "switch", "-c", "{name}"]
 
 [recipe.git-branch.args.name]
 help = "name of the new branch"
+level = "info"
 
 [recipe.git-branch.annotations]
 title = "Git Create Branch"
@@ -134,6 +136,7 @@ run = ["git", "switch", "{name}"]
 
 [recipe.git-switch.args.name]
 help = "name of the branch to switch to"
+level = "info"
 
 [recipe.git-switch.annotations]
 title = "Git Switch Branch"
@@ -159,6 +162,8 @@ run = ["git", "add", "{path}"]
 
 [recipe.git-add.args.path]
 help = "file or directory to stage"
+level = "info"
+type = "path"
 
 [recipe.git-add.annotations]
 title = "Git Stage File"
@@ -173,9 +178,13 @@ run = ["git", "mv", "{source}", "{destination}"]
 
 [recipe.git-mv.args.source]
 help = "current path of the tracked file"
+level = "info"
+type = "path"
 
 [recipe.git-mv.args.destination]
 help = "new path for the file"
+level = "info"
+type = "path"
 
 [recipe.git-mv.annotations]
 title = "Git Move File"
@@ -190,6 +199,8 @@ run = ["git", "rm", "{path}"]
 
 [recipe.git-rm.args.path]
 help = "file or directory to remove"
+level = "info"
+type = "path"
 
 [recipe.git-rm.annotations]
 title = "Git Remove File"
@@ -204,6 +215,8 @@ run = ["git", "restore", "--staged", "{path}"]
 
 [recipe.git-restore.args.path]
 help = "file or directory to unstage"
+level = "info"
+type = "path"
 
 [recipe.git-restore.annotations]
 title = "Git Unstage File"
@@ -231,6 +244,8 @@ run = ["git", "commit", "--author", "Angelos Drossos <develangel@mail.drossos.de
 
 [recipe.git-commit.args.message]
 help = "commit message"
+level = "info"
+type = "text"
 
 [recipe.git-commit.annotations]
 title = "Git Commit"
@@ -245,6 +260,7 @@ run = ["git", "rebase", "{target}"]
 
 [recipe.git-rebase.args.target]
 help = "branch or commit to rebase onto"
+level = "info"
 
 [recipe.git-rebase.annotations]
 title = "Git Rebase"
@@ -305,9 +321,12 @@ run = ["gh", "pr", "create", "--title", "{title}", "--body", "{body}", "--base",
 
 [recipe.gh-pr-create.args.title]
 help = "PR title"
+level = "info"
 
 [recipe.gh-pr-create.args.body]
 help = "PR description"
+level = "debug"
+type = "text"
 
 [recipe.gh-pr-create.annotations]
 title = "Create Pull Request"
@@ -322,12 +341,16 @@ run = ["gh", "pr", "edit", "{number}", "--title", "{title}", "--body", "{body}"]
 
 [recipe.gh-pr-edit.args.number]
 help = "PR number"
+level = "info"
 
 [recipe.gh-pr-edit.args.title]
 help = "new PR title"
+level = "info"
 
 [recipe.gh-pr-edit.args.body]
 help = "new PR description"
+level = "debug"
+type = "text"
 
 [recipe.gh-pr-edit.annotations]
 title = "Edit Pull Request"
@@ -342,6 +365,7 @@ run = ["gh", "pr", "view", "{number}", "--json", "title,body,comments,reviews"]
 
 [recipe.gh-pr-view.args.number]
 help = "PR number"
+level = "info"
 
 [recipe.gh-pr-view.annotations]
 title = "View Pull Request"
@@ -356,6 +380,7 @@ run = ["gh", "monitor", "review", "view", "{number}", "--unresolved", "--not_out
 
 [recipe.gh-pr-review-comments.args.number]
 help = "PR number"
+level = "info"
 
 [recipe.gh-pr-review-comments.annotations]
 title = "List Review Comments"
@@ -370,9 +395,12 @@ run = ["gh", "pr", "comment", "{number}", "--body", "{body}"]
 
 [recipe.gh-pr-comment.args.number]
 help = "PR number"
+level = "info"
 
 [recipe.gh-pr-comment.args.body]
 help = "reply text"
+level = "debug"
+type = "text"
 
 [recipe.gh-pr-comment.annotations]
 title = "Comment on Pull Request"
@@ -387,9 +415,12 @@ run = ["gh", "pr", "review", "{number}", "--approve", "--body", "{body}"]
 
 [recipe.gh-pr-approve.args.number]
 help = "PR number"
+level = "info"
 
 [recipe.gh-pr-approve.args.body]
 help = "approval comment"
+level = "debug"
+type = "text"
 
 [recipe.gh-pr-approve.annotations]
 title = "Approve Pull Request"
