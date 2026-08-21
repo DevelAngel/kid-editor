@@ -1,6 +1,6 @@
 //! Shared line-addressing for tools that operate on line numbers rather
 //! than exact text — `fs_insert_lines`, `fs_remove_lines`,
-//! `fs_replace_lines`. Negative numbers count from the end of the file,
+//! `fs_replace_line`. Negative numbers count from the end of the file,
 //! mirroring `head`/`tail` (`-1` = last line, `-2` = second-to-last, ...).
 
 /// A possibly negative, 1-indexed line number as received from a client:

@@ -35,7 +35,7 @@ impl McpService {
             open_world_hint = false
         )
     )]
-    fn fs_replace_lines(
+    fn fs_replace_line(
         &self,
         Parameters(input): Parameters<ReplaceLinesInput>,
     ) -> Result<CallToolResult, McpError> {
@@ -91,7 +91,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_lines(Parameters(ReplaceLinesInput {
+        svc.fs_replace_line(Parameters(ReplaceLinesInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: "x".into(),
@@ -106,7 +106,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_lines(Parameters(ReplaceLinesInput {
+        svc.fs_replace_line(Parameters(ReplaceLinesInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: "x\ny".into(),
@@ -121,7 +121,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_lines(Parameters(ReplaceLinesInput {
+        svc.fs_replace_line(Parameters(ReplaceLinesInput {
             path: UnresolvedPath::new("f.txt"),
             line: -1,
             new_str: "x".into(),
@@ -136,7 +136,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        let result = svc.fs_replace_lines(Parameters(ReplaceLinesInput {
+        let result = svc.fs_replace_line(Parameters(ReplaceLinesInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: String::new(),
@@ -151,7 +151,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
-        let result = svc.fs_replace_lines(Parameters(ReplaceLinesInput {
+        let result = svc.fs_replace_line(Parameters(ReplaceLinesInput {
             path: UnresolvedPath::new("f.txt"),
             line: 5,
             new_str: "x".into(),
