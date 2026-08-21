@@ -2,10 +2,38 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.11.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.10.0..v0.11.0) - 2026-08-21
+
+### Bug Fixes
+
+- **(gateway)** log full args/output at right levels - ([72fd14c](https://github.com/DevelAngel/matrix-mcp/commit/72fd14c70f011fcdbbaf9c01ecdf1880c95aeda1)) - Angelos Drossos
+- **(recipes)** use gh-monitor for review comments - ([f03c0ac](https://github.com/DevelAngel/matrix-mcp/commit/f03c0ac1d33540a6c4ff5a14e321ae49e47dd4ba)) - Angelos Drossos
+- **(text)** log full args/output at right levels - ([f20ee1e](https://github.com/DevelAngel/matrix-mcp/commit/f20ee1e253f138b72adeec633a3f2c01fc6dc5ff)) - Angelos Drossos
+
+### Documentation
+
+- add video - ([7599337](https://github.com/DevelAngel/matrix-mcp/commit/75993377f88767644b377f11068face8ab3d06ec)) - Angelos Drossos
+
+### Features
+
+- **(mcp)** [**breaking**] make fs_replace_lines single-line only - ([098dc2c](https://github.com/DevelAngel/matrix-mcp/commit/098dc2c9ce3bfbafcc939d6e3718e73f9ab7d279)) - Angelos Drossos
+- **(mcp)** log recipe parameters per configured level - ([fc4393c](https://github.com/DevelAngel/matrix-mcp/commit/fc4393c606bdf94ea2943eb7ad19b3781e3d2aa0)) - Angelos Drossos
+- **(recipe)** add per-parameter log level and kind - ([e904e9b](https://github.com/DevelAngel/matrix-mcp/commit/e904e9b81d2a340c376f714cd1a631ca57164f11)) - Angelos Drossos
+- **(recipes)** set log level and kind on parameters - ([0cb4d2e](https://github.com/DevelAngel/matrix-mcp/commit/0cb4d2ea03e02ba5aa2addc238648f7907193fab)) - Angelos Drossos
+- **(text)** return edited excerpt instead of a bare summary - ([79f9049](https://github.com/DevelAngel/matrix-mcp/commit/79f9049e1aefb1444eb46ba7ec0d0ddf16822a26)) - Angelos Drossos
+
+### Refactoring
+
+- **(mcp)** [**breaking**] rename fs_replace_lines to fs_replace_line - ([551b23d](https://github.com/DevelAngel/matrix-mcp/commit/551b23df48015d75088bd0dbf883b627fd51e02b)) - Angelos Drossos
+- **(recipe)** trim doc comments, fold formatting into Formatted - ([297d53e](https://github.com/DevelAngel/matrix-mcp/commit/297d53e0c3ccf3c2113f858a82be0d642f4383b4)) - Angelos Drossos
+- **(text)** trim render.rs doc comments to essentials - ([53fb1f5](https://github.com/DevelAngel/matrix-mcp/commit/53fb1f5059d9418ebc4eb62baba8eb182e79dfdd)) - Angelos Drossos
+
 ## [0.10.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.9.0..v0.10.0) - 2026-08-16
 
 ### Bug Fixes
 
+- **(mcp)** [**breaking**] fs_create refuses to overwrite existing files - ([44841b7](https://github.com/DevelAngel/matrix-mcp/commit/44841b7bf9ee1099b6cfcdb7bcb263faa07f82ed)) - Angelos Drossos
+- **(mcp)** shorten fs_create descriptions - ([fe33a00](https://github.com/DevelAngel/matrix-mcp/commit/fe33a0033e4ad466bf4ed6e83935550fdcf724ab)) - Angelos Drossos
 - **(recipe)** restore real per-recipe --help via mut_subcommand - ([e82f85b](https://github.com/DevelAngel/matrix-mcp/commit/e82f85b7c5c539992a1545057edad79469c14720)) - Angelos Drossos
 - **(recipes)** prefix all git recipe titles with "Git" - ([efb63c4](https://github.com/DevelAngel/matrix-mcp/commit/efb63c44ec961ce338ff4020779fdb650f4df792)) - Angelos Drossos
 
