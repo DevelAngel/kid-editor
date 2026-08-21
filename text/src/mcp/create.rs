@@ -38,7 +38,7 @@ impl McpService {
         if path.metadata().is_ok() {
             return Err(McpError::invalid_params(
                 format!(
-                    "{path}: already exists; use fs_replace_lines, fs_insert_lines, or fs_remove_lines to edit it"
+                    "{path}: already exists; use fs_replace_line, fs_insert_lines, or fs_remove_lines to edit it"
                 ),
                 None,
             ));

@@ -45,8 +45,9 @@ look around, read closely, change precisely.
   a stale line number just produces a visibly wrong edit or an out-of-range error,
   not a silent match against text that's no longer there.
 - `fs_insert_lines` and `fs_remove_lines` address by line number or range instead of by exact text,
-  negative numbers counting from the end like `tail`. `fs_replace_lines` addresses a single line the
+  negative numbers counting from the end like `tail`. `fs_replace_line` addresses a single line the
   same way — multi-line ranges caused frequent misfires with large-context LLMs, so it's single-line
+  only; a multi-line span goes through `fs_remove_lines` + `fs_insert_lines` instead.
   only; a multi-line span goes through `fs_remove_lines` + `fs_insert_lines` instead.
 - `fs_create` writes a brand-new file. It refuses to touch a path that already exists —
   overwriting a large file by accident is exactly the kind of silent, expensive mistake
