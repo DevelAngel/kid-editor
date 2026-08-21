@@ -1,21 +1,12 @@
-//! Shared line-numbered rendering, used by `fs_view` and every
-//! line-editing tool so both read identically: a header naming the path
-//! and line range, followed by numbered lines. Editing tools render
-//! this against the file's content *after* the edit, with surrounding
-//! context, so the caller can confirm the exact result without a
-//! follow-up `fs_view` call — and, in particular, can see whether it
-//! selected one line too many or too few.
+//! Shared rendering for `fs_view` and the line-editing tools, so both
+//! return the same format.
 
 use std::fmt::Display;
 
-/// Lines of context shown before/after an edit's own range.
 pub(super) const EDIT_CONTEXT: usize = 3;
 
-/// Header + numbered `lines[start-1..end]` (1-indexed, inclusive).
-/// `header_prefix` is prepended to the path — `"Edited "` for an edit
-/// tool, empty for a plain view. Panics if `lines` is empty or the
-/// range is invalid; callers must handle an empty file separately (see
-/// [`empty_file_notice`]).
+/// Panics if `lines` is empty or the range is invalid; callers handle
+/// the empty-file case via [`empty_file_notice`] first.
 pub(super) fn render_excerpt(
     header_prefix: &str,
     path: impl Display,
@@ -30,19 +21,13 @@ pub(super) fn render_excerpt(
     out
 }
 
-/// The message shown in place of [`render_excerpt`] when the file has
-/// no lines left to show (e.g. after removing everything, or a freshly
-/// created empty file).
 pub(super) fn empty_file_notice(header_prefix: &str, path: impl Display) -> String {
     format!("{header_prefix}{path}: file is empty\n")
 }
 
-/// Expands `[start, start + touched.max(1) - 1]` by [`EDIT_CONTEXT`]
-/// lines on each side, clamped to `[1, total_lines]`. `touched` is how
-/// many lines the edit's new content occupies starting at `start` (`0`
-/// for a pure removal — the line now sitting at `start` is shown
-/// instead, for orientation). `total_lines` must be `>= 1`; callers
-/// handle the empty-file case via [`empty_file_notice`] before this.
+/// `touched` is how many lines the edit's new content occupies
+/// starting at `start`; `0` for a pure removal, so the line now
+/// sitting at `start` is shown instead.
 pub(super) fn context_range(start: usize, touched: usize, total_lines: usize) -> (usize, usize) {
     debug_assert!(total_lines > 0, "caller must handle the empty file itself");
     let end = start + touched.max(1) - 1;
