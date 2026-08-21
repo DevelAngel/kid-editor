@@ -7,6 +7,7 @@ mod insert_lines;
 mod line_address;
 mod recipe_run;
 mod remove_lines;
+mod render;
 mod replace_lines;
 mod search;
 mod tree;

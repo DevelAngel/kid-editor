@@ -1,4 +1,5 @@
 use super::McpService;
+use super::render::{empty_file_notice, render_excerpt};
 use super::workspace_path::{UnresolvedPath, WorkspacePath, not_found_or_io};
 
 use anyhow::Result;
@@ -51,13 +52,27 @@ impl McpService {
         let content = path
             .read_to_string()
             .map_err(|e| McpError::internal_error(format!("{path}: {e}"), None))?;
-        let text = render_numbered(&content, input.view_range)?;
+        let text = render_view(&path, &content, input.view_range)?;
         Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 }
 
-fn render_numbered(content: &str, view_range: Option<[usize; 2]>) -> Result<String, McpError> {
+fn render_view(
+    path: &WorkspacePath,
+    content: &str,
+    view_range: Option<[usize; 2]>,
+) -> Result<String, McpError> {
     let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        if let Some([start, end]) = view_range {
+            return Err(McpError::invalid_params(
+                format!("invalid view_range [{start}, {end}] for an empty file"),
+                None,
+            ));
+        }
+        return Ok(empty_file_notice("", path));
+    }
+
     let (start, end) = match view_range {
         Some([start, end]) => {
             if start == 0 || start > lines.len() || end < start {
@@ -74,11 +89,7 @@ fn render_numbered(content: &str, view_range: Option<[usize; 2]>) -> Result<Stri
         None => (1, lines.len()),
     };
 
-    let mut out = String::with_capacity(content.len() + lines.len() * 8);
-    for (i, line) in lines[start - 1..end].iter().enumerate() {
-        out.push_str(&format!("{:6}\t{}\n", start + i, line));
-    }
-    Ok(out)
+    Ok(render_excerpt("", path, &lines, start, end))
 }
 
 fn list_directory(path: &WorkspacePath) -> Result<String, McpError> {
