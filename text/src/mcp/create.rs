@@ -1,4 +1,5 @@
 use super::McpService;
+use super::render::{empty_file_notice, render_excerpt};
 use super::workspace_path::UnresolvedPath;
 
 use anyhow::Result;
@@ -47,9 +48,14 @@ impl McpService {
             .open()
             .and_then(|mut file| file.write_all(input.file_text.as_bytes()))
             .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
-        Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "wrote {write}"
-        ))]))
+
+        let lines: Vec<&str> = input.file_text.lines().collect();
+        let text = if lines.is_empty() {
+            empty_file_notice("Edited ", &write)
+        } else {
+            render_excerpt("Edited ", &write, &lines, 1, lines.len())
+        };
+        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 }
 
