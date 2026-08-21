@@ -166,6 +166,14 @@ fn run(
         provided.push(value.to_owned());
     }
 
+    for (level, line) in recipe.log_lines(&provided, workspace_root) {
+        match level {
+            recipe::ArgLogLevel::Debug => tracing::debug!("{line}"),
+            recipe::ArgLogLevel::Info => tracing::info!("{line}"),
+            recipe::ArgLogLevel::Hidden => {}
+        }
+    }
+
     let output = recipe
         .execute(&provided, workspace_root)
         .map_err(|e| McpError::internal_error(format!("failed to run recipe: {e}"), None))?;
