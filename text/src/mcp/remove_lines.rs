@@ -1,5 +1,6 @@
 use super::McpService;
 use super::line_address::{JoinLines, LineRange};
+use super::render::{context_range, empty_file_notice, render_excerpt};
 use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
@@ -48,7 +49,6 @@ impl McpService {
         let (start, end) = LineRange::new(input.start_line, input.end_line)
             .resolve(lines.len())
             .map_err(|msg| McpError::invalid_params(msg, None))?;
-        let removed = end - start + 1;
         lines.drain((start - 1)..end);
         let updated = lines.rejoin(&content);
 
@@ -57,9 +57,15 @@ impl McpService {
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
             .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
-        Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "removed {removed} line(s) ({start}-{end}) from {write}"
-        ))]))
+
+        let updated_lines: Vec<&str> = updated.lines().collect();
+        let text = if updated_lines.is_empty() {
+            empty_file_notice("Edited ", &write)
+        } else {
+            let (ctx_start, ctx_end) = context_range(start, 0, updated_lines.len());
+            render_excerpt("Edited ", &write, &updated_lines, ctx_start, ctx_end)
+        };
+        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 }
 

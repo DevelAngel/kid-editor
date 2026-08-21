@@ -7,6 +7,7 @@ mod insert_lines;
 mod line_address;
 mod recipe_run;
 mod remove_lines;
+mod render;
 mod replace_lines;
 mod search;
 mod tree;
@@ -27,7 +28,6 @@ use rmcp::model::{
 };
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
-use serde_json::Value;
 
 use std::path::PathBuf;
 
@@ -97,15 +97,13 @@ impl ServerHandler for McpService {
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
         let tool_name = request.name.to_string();
-        let path = request
+        tracing::debug!(tool = %tool_name, arguments = ?request.arguments, "tool called");
+        let input_chars = request
             .arguments
             .as_ref()
-            .and_then(|args| args.get("path"))
-            .and_then(Value::as_str)
-            .unwrap_or("-")
-            .to_owned();
-        tracing::info!(tool = %tool_name, path = %path, "tool called");
-        tracing::debug!(tool = %tool_name, arguments = ?request.arguments, "tool arguments");
+            .and_then(|args| serde_json::to_string(args).ok())
+            .map(|s| s.chars().count())
+            .unwrap_or(0);
 
         let result = if let Some(result) = recipe_run::call(
             &self.recipes,
@@ -123,7 +121,7 @@ impl ServerHandler for McpService {
         match &result {
             Ok(response) => {
                 let output = response.output_text();
-                tracing::info!(tool = %tool_name, output_chars = output.chars().count(), "tool succeeded");
+                tracing::info!(tool = %tool_name, input_chars, output_chars = output.chars().count(), "tool succeeded");
                 tracing::debug!(tool = %tool_name, output = %output, "tool output");
             }
             Err(error) => tracing::info!(tool = %tool_name, %error, "tool failed"),

@@ -1,5 +1,6 @@
 use super::McpService;
 use super::line_address::{JoinLines, LineAddress};
+use super::render::{context_range, empty_file_notice, render_excerpt};
 use super::workspace_path::{UnresolvedPath, not_found_or_io};
 
 use anyhow::Result;
@@ -75,14 +76,17 @@ impl McpService {
             .open()
             .and_then(|mut file| file.write_all(updated.as_bytes()))
             .map_err(|e| McpError::internal_error(format!("{write}: {e}"), None))?;
-        let position = match input.position {
-            Position::Before => "before",
-            Position::After => "after",
+
+        let new_start = anchor + 1;
+        let touched = input.new_str.lines().count().max(1);
+        let updated_lines: Vec<&str> = updated.lines().collect();
+        let text = if updated_lines.is_empty() {
+            empty_file_notice("Edited ", &write)
+        } else {
+            let (ctx_start, ctx_end) = context_range(new_start, touched, updated_lines.len());
+            render_excerpt("Edited ", &write, &updated_lines, ctx_start, ctx_end)
         };
-        Ok(CallToolResult::success(vec![ContentBlock::text(format!(
-            "inserted {position} line {} in {write}",
-            input.line
-        ))]))
+        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
     }
 }
 
