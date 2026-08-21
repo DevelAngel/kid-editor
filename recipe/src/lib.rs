@@ -35,9 +35,7 @@ impl Display for RecipeName {
     }
 }
 
-/// Whether and at what severity a parameter's value is logged by
-/// [`Recipe::log_lines`]. Independent of [`ArgKind`], which only affects
-/// formatting, not visibility.
+/// Whether and at what severity a parameter's value is logged.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArgLogLevel {
@@ -47,12 +45,10 @@ pub enum ArgLogLevel {
     Info,
 }
 
-/// Formatting hint for a parameter's value when logged. `Value` (the
-/// default) renders as `name=value` on one line. `Path` renders the same
-/// way, plus a best-effort workspace-membership check (see
-/// `log_lines`) — informational only, not an access decision. `Text`
-/// renders as an indented multi-line block instead, so embedded newlines
-/// show up as real line breaks rather than an escaped `\n`.
+/// How a parameter's value is formatted when logged: `Value` as
+/// `name=value`, `Path` the same plus a best-effort workspace-membership
+/// note, `Text` as an indented multi-line block so newlines stay real
+/// line breaks instead of an escaped `\n`.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArgKind {
@@ -147,17 +143,9 @@ impl Recipe {
             })
     }
 
-    /// Builds one log line per severity actually used among this
-    /// recipe's `level`-tagged args, in this recipe's own parameter
-    /// order. Almost always zero or one line; a recipe mixing `debug`
-    /// and `info` args produces both, kept separate so each line keeps
-    /// its own severity rather than being merged under the wrong one.
-    /// Args left at the default `level = "hidden"` never appear.
-    ///
-    /// `workspace_root` is only used for `kind = "path"` args, to add a
-    /// best-effort "is this actually inside the workspace" note — this
-    /// is informational for the log, not an access check (see
-    /// `text`'s `workspace_path` module for the real one).
+    /// One log line per severity actually used among this recipe's
+    /// `level`-tagged args (usually zero or one), in parameter order.
+    /// `workspace_root` is only consulted for `kind = "path"` args.
     pub fn log_lines(
         &self,
         provided: &[String],
@@ -169,7 +157,7 @@ impl Recipe {
             let formatted = match arg.level {
                 ArgLogLevel::Hidden => continue,
                 ArgLogLevel::Debug | ArgLogLevel::Info => {
-                    format_arg(name, arg.kind, value, workspace_root)
+                    Formatted::new(name, arg.kind, value, workspace_root)
                 }
             };
             match arg.level {
@@ -185,48 +173,70 @@ impl Recipe {
         ]
         .into_iter()
         .filter(|(_, parts)| !parts.is_empty())
-        .map(|(level, parts)| (level, join_formatted(&parts)))
+        .map(|(level, parts)| (level, Formatted::join(&parts)))
         .collect()
     }
 }
 
-/// One formatted parameter, pending assembly into a full log line by
-/// [`join_formatted`]. `Inline` sits on the line's shared `, `-joined
-/// segment; `Block` (from `kind = "text"`) gets its own multi-line
-/// segment so a value's embedded newlines stay real line breaks.
+/// One formatted parameter, pending assembly into a full log line.
 enum Formatted {
     Inline(String),
     Block { name: String, indented: String },
 }
 
-fn format_arg(name: &str, kind: ArgKind, value: &str, workspace_root: &Path) -> Formatted {
-    match kind {
-        ArgKind::Value => Formatted::Inline(format!("{name}={value}")),
-        ArgKind::Path => Formatted::Inline(format!(
-            "{name}={value}{}",
-            path_note(value, workspace_root)
-        )),
-        ArgKind::Text => {
-            let indented = value
-                .lines()
-                .map(|line| format!("    {line}"))
-                .collect::<Vec<_>>()
-                .join("\n");
-            Formatted::Block {
-                name: name.to_owned(),
-                indented,
+impl Formatted {
+    fn new(name: &str, kind: ArgKind, value: &str, workspace_root: &Path) -> Self {
+        match kind {
+            ArgKind::Value => Self::Inline(format!("{name}={value}")),
+            ArgKind::Path => Self::Inline(format!(
+                "{name}={value}{}",
+                path_note(value, workspace_root)
+            )),
+            ArgKind::Text => {
+                let indented = value
+                    .lines()
+                    .map(|line| format!("    {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Self::Block {
+                    name: name.to_owned(),
+                    indented,
+                }
             }
         }
     }
+
+    /// Joins one severity's formatted args: `Inline` parts share one
+    /// comma-joined segment first, then each `Block` follows as its own
+    /// segment.
+    fn join(parts: &[Formatted]) -> String {
+        let mut segments = Vec::new();
+
+        let inline = parts
+            .iter()
+            .filter_map(|p| match p {
+                Self::Inline(s) => Some(s.as_str()),
+                Self::Block { .. } => None,
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !inline.is_empty() {
+            segments.push(inline);
+        }
+
+        for part in parts {
+            if let Self::Block { name, indented } = part {
+                segments.push(format!("{name}:\n{indented}"));
+            }
+        }
+
+        segments.join("\n")
+    }
 }
 
-/// Best-effort, informational only — never used to grant or deny
-/// access. `value` is resolved the same way a plain filesystem path
-/// would be (absolute values are taken as-is, relative ones joined onto
-/// `workspace_root`), then canonicalized so `..`/symlinks are actually
-/// followed rather than merely inspected lexically. A path that doesn't
-/// exist yet (e.g. a `create` target) can't be canonicalized, hence
-/// "unresolved" rather than a false "outside".
+/// Informational only, not an access check. Returns "unresolved"
+/// instead of a false "outside" when `value` doesn't exist yet (e.g. a
+/// `create` target).
 fn path_note(value: &str, workspace_root: &Path) -> &'static str {
     let Ok(canonical_root) = workspace_root.canonicalize() else {
         return " (unresolved)";
@@ -236,33 +246,6 @@ fn path_note(value: &str, workspace_root: &Path) -> &'static str {
         Ok(_) => " (outside workspace)",
         Err(_) => " (unresolved)",
     }
-}
-
-/// Joins one severity's formatted args into a single log line: all
-/// `Inline` parts share one `, `-joined segment first, then each `Block`
-/// follows as its own `name:`-headed segment.
-fn join_formatted(parts: &[Formatted]) -> String {
-    let mut segments = Vec::new();
-
-    let inline = parts
-        .iter()
-        .filter_map(|p| match p {
-            Formatted::Inline(s) => Some(s.as_str()),
-            Formatted::Block { .. } => None,
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    if !inline.is_empty() {
-        segments.push(inline);
-    }
-
-    for part in parts {
-        if let Formatted::Block { name, indented } = part {
-            segments.push(format!("{name}:\n{indented}"));
-        }
-    }
-
-    segments.join("\n")
 }
 
 /// Replaces every `{name}` occurrence in `part` with its substitution.
