@@ -13,7 +13,6 @@ use rmcp::transport::streamable_http_client::{
     StreamableHttpClientTransport, StreamableHttpClientTransportConfig,
 };
 use rmcp::{RoleClient, RoleServer, ServerHandler};
-use serde_json::Value;
 
 use std::sync::Arc;
 
@@ -70,13 +69,6 @@ impl ServerHandler for GatewayService {
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
         let prefixed_tool_name = request.name.to_string();
-        let path = request
-            .arguments
-            .as_ref()
-            .and_then(|args| args.get("path"))
-            .and_then(Value::as_str)
-            .unwrap_or("-")
-            .to_owned();
 
         let (upstream, tool_name) = self
             .upstreams
@@ -91,8 +83,14 @@ impl ServerHandler for GatewayService {
                 McpError::invalid_params(format!("unknown tool: {}", request.name), None)
             })?;
 
-        tracing::info!(tool = %prefixed_tool_name, upstream = %upstream.prefix.trim_end_matches('_'), path = %path, "tool called");
-        tracing::debug!(tool = %prefixed_tool_name, arguments = ?request.arguments, "tool arguments");
+        tracing::debug!(tool = %prefixed_tool_name, arguments = ?request.arguments, "tool called");
+        tracing::debug!(tool = %prefixed_tool_name, arguments = ?request.arguments, "tool called");
+        let input_chars = request
+            .arguments
+            .as_ref()
+            .and_then(|args| serde_json::to_string(args).ok())
+            .map(|s| s.chars().count())
+            .unwrap_or(0);
 
         let result: Result<CallToolResponse, McpError> = upstream
             .client
@@ -116,7 +114,7 @@ impl ServerHandler for GatewayService {
         match &result {
             Ok(response) => {
                 let output = response.output_text();
-                tracing::info!(tool = %prefixed_tool_name, output_chars = output.chars().count(), "tool succeeded");
+                tracing::info!(tool = %prefixed_tool_name, input_chars, output_chars = output.chars().count(), "tool succeeded");
                 tracing::debug!(tool = %prefixed_tool_name, output = %output, "tool output");
             }
             Err(error) => tracing::info!(tool = %prefixed_tool_name, %error, "tool failed"),
