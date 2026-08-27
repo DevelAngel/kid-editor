@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.11.1](https://github.com/DevelAngel/matrix-mcp/compare/v0.11.0..v0.11.1) - 2026-08-27
+
+### Bug Fixes
+
+- **(mcp)** enforce single-line replacement - ([fb605ca](https://github.com/DevelAngel/matrix-mcp/commit/fb605ca8c411ef1775af20262060bd9ebb69e39d)) - Angelos Drossos
+
+### Style
+
+- **(mcp)** use std assert_matches import - ([1cb400c](https://github.com/DevelAngel/matrix-mcp/commit/1cb400c872ea1445d604b38f56c64b35b825409e)) - Angelos Drossos
+- **(mcp)** use assert_matches imports - ([70bdfb5](https://github.com/DevelAngel/matrix-mcp/commit/70bdfb584df8197225fdcb9988aa15251f47837b)) - Angelos Drossos
+- **(mcp)** use error code imports - ([f473251](https://github.com/DevelAngel/matrix-mcp/commit/f473251b3f1eee3be57e878bd58272bf90334468)) - Angelos Drossos
+
+### Tests
+
+- **(mcp)** assert replacement error type - ([fbcdb3d](https://github.com/DevelAngel/matrix-mcp/commit/fbcdb3d1cb0bc1c76cfa618b09640e5aaa7e126a)) - Angelos Drossos
+- **(mcp)** assert tool error types - ([73486a5](https://github.com/DevelAngel/matrix-mcp/commit/73486a5912befeae7ba8fd884c973c955260d0b8)) - Angelos Drossos
+- **(mcp)** assert glob parse errors - ([c39314d](https://github.com/DevelAngel/matrix-mcp/commit/c39314dd7193bc37c240943148e4a887146081ba)) - Angelos Drossos
+
 ## [0.11.0](https://github.com/DevelAngel/matrix-mcp/compare/v0.10.0..v0.11.0) - 2026-08-21
 
 ### Bug Fixes
