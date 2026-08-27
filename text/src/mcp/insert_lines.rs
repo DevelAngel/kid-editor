@@ -95,6 +95,7 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use recipe::RecipeFile;
+    use std::assert_matches;
     use std::fs;
 
     #[test]
@@ -172,6 +173,6 @@ mod tests {
             position: Position::After,
             new_str: "x".into(),
         }));
-        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
     }
 }
