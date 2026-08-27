@@ -623,8 +623,12 @@ mod tests {
 
     #[test]
     fn invalid_glob_pattern_is_rejected_at_parse_time() {
-        assert!("[".parse::<IgnorePattern>().is_err());
-        assert!("/[".parse::<IgnorePattern>().is_err());
+        assert_matches!("[".parse::<IgnorePattern>(), Err(PatternError { .. }));
+    }
+
+    #[test]
+    fn anchored_invalid_glob_pattern_is_rejected_at_parse_time() {
+        assert_matches!("/[".parse::<IgnorePattern>(), Err(PatternError { .. }));
     }
 
     #[test]
