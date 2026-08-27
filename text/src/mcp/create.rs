@@ -88,7 +88,7 @@ mod tests {
             path: UnresolvedPath::new("f.txt"),
             file_text: "overwritten\n".to_string(),
         }));
-        assert!(result.is_err());
+        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
         let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
         assert_eq!(content, "original\n");
     }

@@ -146,7 +146,7 @@ mod tests {
             start_line: 3,
             end_line: 1,
         }));
-        assert!(result.is_err());
+        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
     }
 
     #[test]
@@ -159,6 +159,6 @@ mod tests {
             start_line: 1,
             end_line: 5,
         }));
-        assert!(result.is_err());
+        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
     }
 }
