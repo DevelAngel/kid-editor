@@ -95,9 +95,9 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use recipe::RecipeFile;
+    use rmcp::model::ErrorCode;
     use std::assert_matches;
     use std::fs;
-
     #[test]
     fn inserts_after_given_line() {
         let dir = TempDir::new().unwrap();
@@ -173,6 +173,6 @@ mod tests {
             position: Position::After,
             new_str: "x".into(),
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
     }
 }

@@ -91,9 +91,9 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use recipe::RecipeFile;
+    use rmcp::model::ErrorCode;
     use std::assert_matches;
     use std::fs;
-
     #[test]
     fn replaces_single_line() {
         let dir = TempDir::new().unwrap();
@@ -119,7 +119,7 @@ mod tests {
             line: 2,
             new_str: "x\ny".into(),
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
         let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\n");
     }
@@ -149,7 +149,7 @@ mod tests {
             line: 2,
             new_str: String::new(),
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
         let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\n");
     }
@@ -164,6 +164,6 @@ mod tests {
             line: 5,
             new_str: "x".into(),
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
     }
 }
