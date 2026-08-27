@@ -118,7 +118,7 @@ mod tests {
             line: 2,
             new_str: "x\ny".into(),
         }));
-        assert!(result.is_err());
+        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
         let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\n");
     }
