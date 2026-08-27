@@ -172,6 +172,6 @@ mod tests {
             position: Position::After,
             new_str: "x".into(),
         }));
-        assert!(result.is_err());
+        std::assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
     }
 }
