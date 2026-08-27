@@ -13,7 +13,7 @@ use serde::Deserialize;
 use std::io::Write;
 
 #[derive(Debug, Deserialize, JsonSchema)]
-pub struct ReplaceLinesInput {
+pub struct ReplaceLineInput {
     path: UnresolvedPath,
     /// 1-indexed line to replace; negative numbers count from the end
     /// of the file (-1 = last line), like `tail`
@@ -23,12 +23,12 @@ pub struct ReplaceLinesInput {
     new_str: String,
 }
 
-#[tool_router(router = replace_lines_tool_router, vis = "pub(super)")]
+#[tool_router(router = replace_line_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
         description = "Replace a single line with new text (negative counts from the end, like tail)",
         annotations(
-            title = "Replace Lines",
+            title = "Replace Line",
             read_only_hint = false,
             destructive_hint = true,
             idempotent_hint = false,
@@ -37,8 +37,15 @@ impl McpService {
     )]
     fn fs_replace_line(
         &self,
-        Parameters(input): Parameters<ReplaceLinesInput>,
+        Parameters(input): Parameters<ReplaceLineInput>,
     ) -> Result<CallToolResult, McpError> {
+        if input.new_str.contains(['\n', '\r']) {
+            return Err(McpError::invalid_params(
+                "new_str must contain exactly one line",
+                None,
+            ));
+        }
+
         if input.new_str.is_empty() {
             return Err(McpError::invalid_params(
                 "new_str must not be empty; use fs_remove_lines to delete a line",
@@ -91,7 +98,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_line(Parameters(ReplaceLinesInput {
+        svc.fs_replace_line(Parameters(ReplaceLineInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: "x".into(),
@@ -102,18 +109,18 @@ mod tests {
     }
 
     #[test]
-    fn new_str_with_embedded_newline_replaces_one_target_line() {
+    fn new_str_with_embedded_newline_is_rejected() {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_line(Parameters(ReplaceLinesInput {
+        let result = svc.fs_replace_line(Parameters(ReplaceLineInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: "x\ny".into(),
-        }))
-        .unwrap();
+        }));
+        assert!(result.is_err());
         let content = fs::read_to_string(dir.path().join("f.txt")).unwrap();
-        assert_eq!(content, "a\nx\ny\nc\n");
+        assert_eq!(content, "a\nb\nc\n");
     }
 
     #[test]
@@ -121,7 +128,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        svc.fs_replace_line(Parameters(ReplaceLinesInput {
+        svc.fs_replace_line(Parameters(ReplaceLineInput {
             path: UnresolvedPath::new("f.txt"),
             line: -1,
             new_str: "x".into(),
@@ -136,7 +143,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
-        let result = svc.fs_replace_line(Parameters(ReplaceLinesInput {
+        let result = svc.fs_replace_line(Parameters(ReplaceLineInput {
             path: UnresolvedPath::new("f.txt"),
             line: 2,
             new_str: String::new(),
@@ -151,7 +158,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
-        let result = svc.fs_replace_line(Parameters(ReplaceLinesInput {
+        let result = svc.fs_replace_line(Parameters(ReplaceLineInput {
             path: UnresolvedPath::new("f.txt"),
             line: 5,
             new_str: "x".into(),

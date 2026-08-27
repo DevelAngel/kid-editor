@@ -8,7 +8,7 @@ mod line_address;
 mod recipe_run;
 mod remove_lines;
 mod render;
-mod replace_lines;
+mod replace_line;
 mod search;
 mod tree;
 mod view;
@@ -174,7 +174,7 @@ impl McpService {
         let tool_router = Self::create_tool_router()
             + Self::insert_lines_tool_router()
             + Self::remove_lines_tool_router()
-            + Self::replace_lines_tool_router()
+            + Self::replace_line_tool_router()
             + Self::search_tool_router()
             + Self::tree_tool_router()
             + Self::view_tool_router();
