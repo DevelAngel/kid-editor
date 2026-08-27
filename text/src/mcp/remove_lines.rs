@@ -74,9 +74,9 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use recipe::RecipeFile;
+    use rmcp::model::ErrorCode;
     use std::assert_matches;
     use std::fs;
-
     #[test]
     fn removes_single_line() {
         let dir = TempDir::new().unwrap();
@@ -147,7 +147,7 @@ mod tests {
             start_line: 3,
             end_line: 1,
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
     }
 
     #[test]
@@ -160,6 +160,6 @@ mod tests {
             start_line: 1,
             end_line: 5,
         }));
-        assert_matches!(result, Err(McpError { code, .. }) if code == rmcp::model::ErrorCode::INVALID_PARAMS);
+        assert_matches!(result, Err(McpError { code, .. }) if code == ErrorCode::INVALID_PARAMS);
     }
 }
