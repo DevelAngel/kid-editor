@@ -28,6 +28,7 @@ use rmcp::model::{
 };
 use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
+use serde_json::Value;
 
 use std::path::PathBuf;
 
@@ -98,6 +99,15 @@ impl ServerHandler for McpService {
     ) -> Result<CallToolResponse, McpError> {
         let tool_name = request.name.to_string();
         tracing::debug!(tool = %tool_name, arguments = ?request.arguments, "tool called");
+        if let Some(path) = request
+            .arguments
+            .as_ref()
+            .and_then(|arguments| arguments.get("path"))
+            .and_then(Value::as_str)
+        {
+            tracing::info!(tool = %tool_name, path = %path, "tool path");
+        }
+
         let input_chars = request
             .arguments
             .as_ref()
