@@ -37,6 +37,7 @@ async fn main() -> Result<()> {
         .workspace_root(cli.workspace_root)
         .ignore(cli.ignore.into_iter().chain(cli.extra_ignore).collect())
         .recipes_file(cli.recipes_file)
+        .disable_fs_tools(cli.disable_fs_tools)
         .clients(clients)
         .build()
         .serve(cli.addr)

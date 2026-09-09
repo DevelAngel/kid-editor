@@ -50,6 +50,12 @@ pub struct Cli {
     #[clap(long = "extra-ignore", value_name = "PATTERN", value_hint = ValueHint::AnyPath, value_delimiter = ',')]
     pub extra_ignore: Vec<IgnorePattern>,
 
+    /// Disable the fs_* filesystem tools (create, view, tree, search,
+    /// insert_lines, remove_lines, replace_line), leaving only
+    /// recipe_run (if enabled) exposed
+    #[clap(long)]
+    pub disable_fs_tools: bool,
+
     /// Let the AI run commands defined in this TOML recipe file
     // Same reasoning as --enable-just-run, for a simpler, `just`-free
     // command format (see ADR 0004). Needs both: this flag set, and the

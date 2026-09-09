@@ -33,6 +33,7 @@ pub struct McpServer {
     allowed_origins: Vec<Url>,
     ignore: Vec<IgnorePattern>,
     recipes_file: Option<PathBuf>,
+    disable_fs_tools: bool,
 }
 
 impl McpServer {
@@ -45,6 +46,14 @@ impl McpServer {
                 .map(|p| p.to_string())
                 .reduce(|s, name| format!("{s} | {name}"))
                 .unwrap_or("none".to_owned())
+        );
+        tracing::warn!(
+            "fs_* filesystem tools: {}",
+            if self.disable_fs_tools {
+                "disabled"
+            } else {
+                "enabled"
+            }
         );
 
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
@@ -68,6 +77,7 @@ impl McpServer {
         let shutdown = CancellationToken::new();
         let workspace_root = self.workspace_root.canonicalize()?;
         let ignore = self.ignore;
+        let disable_fs_tools = self.disable_fs_tools;
 
         let (recipes, recipe_toml_protected_path) = if let Some(recipes_file) = &self.recipes_file {
             let recipes_path = if recipes_file.is_absolute() {
@@ -134,6 +144,7 @@ impl McpServer {
                     ignore.clone(),
                     recipes.clone(),
                     recipe_toml_protected_path.clone(),
+                    disable_fs_tools,
                 ))
             },
             LocalSessionManager::default().into(),

@@ -121,7 +121,13 @@ mod tests {
 
     fn service_with(dir: &TempDir, ignore: &[&str]) -> McpService {
         let ignore = ignore.iter().map(|p| p.parse().unwrap()).collect();
-        McpService::new(dir.to_path_buf(), ignore, RecipeFile::default(), None)
+        McpService::new(
+            dir.to_path_buf(),
+            ignore,
+            RecipeFile::default(),
+            None,
+            false,
+        )
     }
 
     fn search_text(svc: &McpService, query: &str, case_insensitive: bool) -> String {
