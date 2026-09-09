@@ -101,7 +101,13 @@ mod tests {
     #[test]
     fn inserts_after_given_line() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.fs_insert_lines(Parameters(InsertLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -117,7 +123,13 @@ mod tests {
     #[test]
     fn inserts_before_given_line() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.fs_insert_lines(Parameters(InsertLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -133,7 +145,13 @@ mod tests {
     #[test]
     fn negative_line_counts_from_end() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
         svc.fs_insert_lines(Parameters(InsertLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -149,7 +167,13 @@ mod tests {
     #[test]
     fn inserts_into_empty_file() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "").unwrap();
         svc.fs_insert_lines(Parameters(InsertLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -165,7 +189,13 @@ mod tests {
     #[test]
     fn out_of_range_line_is_rejected() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         let result = svc.fs_insert_lines(Parameters(InsertLinesInput {
             path: UnresolvedPath::new("f.txt"),

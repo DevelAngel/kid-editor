@@ -71,7 +71,13 @@ mod tests {
     #[test]
     fn creates_new_file() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         svc.fs_create(Parameters(CreateInput {
             path: UnresolvedPath::new("f.txt"),
             file_text: "a\nb\n".to_string(),
@@ -84,7 +90,13 @@ mod tests {
     #[test]
     fn refuses_to_overwrite_existing_file() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "original\n").unwrap();
         let result = svc.fs_create(Parameters(CreateInput {
             path: UnresolvedPath::new("f.txt"),

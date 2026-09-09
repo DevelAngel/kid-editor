@@ -80,7 +80,13 @@ mod tests {
     #[test]
     fn removes_single_line() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
         svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -95,7 +101,13 @@ mod tests {
     #[test]
     fn removes_range() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\nc\nd\n").unwrap();
         svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -110,7 +122,13 @@ mod tests {
     #[test]
     fn negative_end_counts_from_end() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\nc\nd\n").unwrap();
         svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -125,7 +143,13 @@ mod tests {
     #[test]
     fn removing_all_lines_leaves_empty_file() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -140,7 +164,13 @@ mod tests {
     #[test]
     fn inverted_range_is_rejected() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\nc\n").unwrap();
         let result = svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),
@@ -153,7 +183,13 @@ mod tests {
     #[test]
     fn out_of_range_is_rejected() {
         let dir = TempDir::new().unwrap();
-        let svc = McpService::new(dir.to_path_buf(), vec![], RecipeFile::default(), None);
+        let svc = McpService::new(
+            dir.to_path_buf(),
+            vec![],
+            RecipeFile::default(),
+            None,
+            false,
+        );
         fs::write(dir.path().join("f.txt"), "a\nb\n").unwrap();
         let result = svc.fs_remove_lines(Parameters(RemoveLinesInput {
             path: UnresolvedPath::new("f.txt"),

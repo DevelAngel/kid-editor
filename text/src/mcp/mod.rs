@@ -170,18 +170,22 @@ impl McpService {
         mut ignore: Vec<IgnorePattern>,
         recipes: RecipeFile,
         recipe_toml_protected_path: Option<PathBuf>,
+        disable_fs_tools: bool,
     ) -> Self {
-        let tool_router = Self::create_tool_router()
-            + Self::insert_lines_tool_router()
-            + Self::remove_lines_tool_router()
-            + Self::replace_line_tool_router()
-            + Self::search_tool_router()
-            + Self::tree_tool_router()
-            + Self::view_tool_router();
-
         if let Some(protected) = &recipe_toml_protected_path {
             ignore.push(IgnorePattern::exact_path(protected.clone()));
         }
+        let tool_router = if disable_fs_tools {
+            ToolRouter::new()
+        } else {
+            Self::create_tool_router()
+                + Self::insert_lines_tool_router()
+                + Self::remove_lines_tool_router()
+                + Self::replace_line_tool_router()
+                + Self::search_tool_router()
+                + Self::tree_tool_router()
+                + Self::view_tool_router()
+        };
 
         Self {
             workspace_root,
