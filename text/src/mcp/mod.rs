@@ -2,6 +2,8 @@
 //! scoped to a single workspace directory.
 //! All paths, relative or absolute, are resolved against the workspace root
 //! and rejected if they would escape it.
+mod git;
+
 mod create;
 mod insert_lines;
 mod line_address;
@@ -185,6 +187,7 @@ impl McpService {
                 + Self::search_tool_router()
                 + Self::tree_tool_router()
                 + Self::view_tool_router()
+                + Self::git_tool_router()
         };
 
         Self {
