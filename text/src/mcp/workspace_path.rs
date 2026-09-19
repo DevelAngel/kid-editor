@@ -145,6 +145,20 @@ impl UnresolvedPath {
         WorkspacePath::new(self, workspace_root, ignore)
     }
 
+    pub(crate) fn resolve_from(
+        self,
+        base: &WorkspacePath,
+        workspace_root: &Path,
+        ignore: &[IgnorePattern],
+    ) -> Result<WorkspacePath, McpError> {
+        if self.0.is_absolute() {
+            self.resolve(workspace_root, ignore)
+        } else {
+            let relative = base.relative.join(&self.0);
+            UnresolvedPath(relative).resolve(workspace_root, ignore)
+        }
+    }
+
     /// Lexically collapses `.` and `..`, without touching the filesystem —
     /// so this also works for paths that don't exist yet (`create`).
     /// Returns `None` if a `..` has nothing left to pop: that means the
@@ -265,6 +279,12 @@ impl WorkspacePath {
 
     pub(super) fn metadata(&self) -> io::Result<Metadata> {
         fs::metadata(&self.absolute)
+    }
+
+    pub(crate) fn relative_to(&self, base: &WorkspacePath) -> &Path {
+        self.relative
+            .strip_prefix(&base.relative)
+            .unwrap_or(&self.relative)
     }
 
     pub(super) fn read_dir(&self) -> io::Result<ReadDir> {
