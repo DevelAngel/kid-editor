@@ -31,16 +31,70 @@ struct CommitInput {
     /// Amend the previous commit instead of creating a new one.
     #[serde(default)]
     amend: bool,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
-struct AddInput {
-    /// File or directory path relative to the workspace root.
-    path: UnresolvedPath,
+struct CwdInput {
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
 }
 
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-struct EmptyInput {}
+#[derive(Debug, Deserialize, JsonSchema)]
+struct PathInput {
+    /// File or directory path relative to the working directory.
+    path: UnresolvedPath,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct MoveInput {
+    /// Current path relative to the working directory.
+    source: UnresolvedPath,
+    /// Destination path relative to the working directory.
+    destination: UnresolvedPath,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct BranchInput {
+    /// Branch name.
+    name: String,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct LogInput {
+    /// Maximum number of commits to show.
+    #[serde(default = "default_log_limit")]
+    limit: u32,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct PushInput {
+    /// Use force-with-lease instead of a normal push.
+    #[serde(default)]
+    force: bool,
+    /// Optional workspace-relative working directory.
+    #[serde(default)]
+    cwd: Option<UnresolvedPath>,
+}
+
+fn default_log_limit() -> u32 {
+    20
+}
 
 #[derive(Debug)]
 struct ProcessOutput {
@@ -284,6 +338,26 @@ async fn run_process(
     })
 }
 
+fn resolve_cwd(
+    cwd: Option<UnresolvedPath>,
+    workspace_root: &Path,
+    ignore: &[super::workspace_path::IgnorePattern],
+) -> Result<super::workspace_path::WorkspacePath, McpError> {
+    cwd.map_or_else(
+        || Ok(super::workspace_path::WorkspacePath::root(workspace_root)),
+        |cwd| cwd.resolve(workspace_root, ignore),
+    )
+}
+
+fn resolve_path(
+    path: UnresolvedPath,
+    cwd: &super::workspace_path::WorkspacePath,
+    workspace_root: &Path,
+    ignore: &[super::workspace_path::IgnorePattern],
+) -> Result<super::workspace_path::WorkspacePath, McpError> {
+    path.resolve_from(cwd, workspace_root, ignore)
+}
+
 #[tool_router(router = git_tool_router, vis = "pub(super)")]
 impl McpService {
     #[tool(
@@ -298,15 +372,10 @@ impl McpService {
     )]
     async fn git_status(
         &self,
-        Parameters(_input): Parameters<EmptyInput>,
+        Parameters(input): Parameters<CwdInput>,
     ) -> Result<CallToolResult, McpError> {
-        command_result(
-            "git",
-            &["status", "--short"],
-            "git status",
-            &self.workspace_root,
-        )
-        .await
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result("git", &["status", "--short"], "git status", cwd.absolute()).await
     }
 
     #[tool(
@@ -321,9 +390,114 @@ impl McpService {
     )]
     async fn git_diff(
         &self,
-        Parameters(_input): Parameters<EmptyInput>,
+        Parameters(input): Parameters<CwdInput>,
     ) -> Result<CallToolResult, McpError> {
-        command_result("git", &["diff"], "git diff", &self.workspace_root).await
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result("git", &["diff"], "git diff", cwd.absolute()).await
+    }
+
+    #[tool(
+        description = "Shows recent Git commits",
+        annotations(
+            title = "Git Log",
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn git_log(
+        &self,
+        Parameters(input): Parameters<LogInput>,
+    ) -> Result<CallToolResult, McpError> {
+        if input.limit == 0 {
+            return Err(McpError::invalid_params(
+                "git log limit must be greater than zero",
+                None,
+            ));
+        }
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let limit = input.limit.to_string();
+        command_result(
+            "git",
+            &[
+                "log",
+                "--no-color",
+                "--graph",
+                "--pretty=format:%h • %s (%(decorate:prefix=,suffix= • )%cr)",
+                "-n",
+                &limit,
+            ],
+            "git log",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Creates and switches to a new Git branch",
+        annotations(
+            title = "Git Branch",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn git_branch(
+        &self,
+        Parameters(input): Parameters<BranchInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result(
+            "git",
+            &["switch", "-c", &input.name],
+            "git branch",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Switches to an existing Git branch",
+        annotations(
+            title = "Git Switch",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn git_switch(
+        &self,
+        Parameters(input): Parameters<BranchInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result(
+            "git",
+            &["switch", &input.name],
+            "git switch",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Pulls changes from the remote with rebase",
+        annotations(
+            title = "Git Pull",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn git_pull(
+        &self,
+        Parameters(input): Parameters<CwdInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result("git", &["pull", "--rebase"], "git pull", cwd.absolute()).await
     }
 
     #[tool(
@@ -338,17 +512,150 @@ impl McpService {
     )]
     async fn git_add(
         &self,
-        Parameters(input): Parameters<AddInput>,
+        Parameters(input): Parameters<PathInput>,
     ) -> Result<CallToolResult, McpError> {
-        let path = input.path.resolve(&self.workspace_root, &self.ignore)?;
-        let path = path.relative();
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let path = resolve_path(input.path, &cwd, &self.workspace_root, &self.ignore)?;
+        let path = path.relative_to(&cwd);
         let path = if path.as_os_str().is_empty() {
             "."
         } else {
             path.to_str()
                 .ok_or_else(|| McpError::invalid_params("git add path must be valid UTF-8", None))?
         };
-        command_result("git", &["add", path], "git add", &self.workspace_root).await
+        command_result("git", &["add", path], "git add", cwd.absolute()).await
+    }
+
+    #[tool(
+        description = "Renames or moves a tracked file with Git",
+        annotations(
+            title = "Git Mv",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn git_mv(
+        &self,
+        Parameters(input): Parameters<MoveInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let source = resolve_path(input.source, &cwd, &self.workspace_root, &self.ignore)?;
+        let destination =
+            resolve_path(input.destination, &cwd, &self.workspace_root, &self.ignore)?;
+        let source = source
+            .relative_to(&cwd)
+            .to_str()
+            .ok_or_else(|| McpError::invalid_params("git mv source must be valid UTF-8", None))?;
+        let destination = destination.relative_to(&cwd).to_str().ok_or_else(|| {
+            McpError::invalid_params("git mv destination must be valid UTF-8", None)
+        })?;
+        command_result(
+            "git",
+            &["mv", source, destination],
+            "git mv",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Removes a tracked file with Git",
+        annotations(
+            title = "Git Rm",
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn git_rm(
+        &self,
+        Parameters(input): Parameters<PathInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let path = resolve_path(input.path, &cwd, &self.workspace_root, &self.ignore)?;
+        let path = path
+            .relative_to(&cwd)
+            .to_str()
+            .ok_or_else(|| McpError::invalid_params("git rm path must be valid UTF-8", None))?;
+        command_result("git", &["rm", path], "git rm", cwd.absolute()).await
+    }
+
+    #[tool(
+        description = "Unstages a file or directory with Git",
+        annotations(
+            title = "Git Restore",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn git_restore(
+        &self,
+        Parameters(input): Parameters<PathInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let path = resolve_path(input.path, &cwd, &self.workspace_root, &self.ignore)?;
+        let path = path.relative_to(&cwd).to_str().ok_or_else(|| {
+            McpError::invalid_params("git restore path must be valid UTF-8", None)
+        })?;
+        command_result(
+            "git",
+            &["restore", "--staged", path],
+            "git restore",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Undoes the last Git commit while keeping its changes staged",
+        annotations(
+            title = "Git Reset Soft",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn git_reset_soft(
+        &self,
+        Parameters(input): Parameters<CwdInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        command_result(
+            "git",
+            &["reset", "--soft", "HEAD~1"],
+            "git reset --soft",
+            cwd.absolute(),
+        )
+        .await
+    }
+
+    #[tool(
+        description = "Pushes the current branch to origin, optionally using force-with-lease",
+        annotations(
+            title = "Git Push",
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn git_push(
+        &self,
+        Parameters(input): Parameters<PushInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
+        let args = if input.force {
+            ["push", "--force-with-lease", "origin", "HEAD"]
+        } else {
+            ["push", "--set-upstream", "origin", "HEAD"]
+        };
+        command_result("git", &args, "git push", cwd.absolute()).await
     }
 
     #[tool(
@@ -377,12 +684,13 @@ impl McpService {
             }
         };
 
+        let cwd = resolve_cwd(input.cwd, &self.workspace_root, &self.ignore)?;
         if input.amend {
             command_result(
                 "git",
                 &["commit", "--amend", "-m", &commit_message],
                 "git commit (amend)",
-                &self.workspace_root,
+                cwd.absolute(),
             )
             .await
         } else {
@@ -390,7 +698,7 @@ impl McpService {
                 "git",
                 &["commit", "-m", &commit_message],
                 "git commit",
-                &self.workspace_root,
+                cwd.absolute(),
             )
             .await
         }
@@ -429,12 +737,32 @@ mod tests {
         let dir = TempDir::new().unwrap();
         git(dir.path(), &["init", "--quiet"]);
         fs::write(dir.path().join("file.txt"), "content\n").unwrap();
-
         let result = service(dir.path())
-            .git_status(Parameters(EmptyInput::default()))
+            .git_status(Parameters(CwdInput { cwd: None }))
             .await
             .unwrap();
+        assert!(
+            result.content[0]
+                .as_text()
+                .unwrap()
+                .text
+                .contains("?? file.txt")
+        );
+    }
 
+    #[tokio::test]
+    async fn git_status_supports_nested_repository() {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path().join("repo");
+        fs::create_dir(&repo).unwrap();
+        git(&repo, &["init", "--quiet"]);
+        fs::write(repo.join("file.txt"), "content\n").unwrap();
+        let result = service(dir.path())
+            .git_status(Parameters(CwdInput {
+                cwd: Some(UnresolvedPath::new("repo")),
+            }))
+            .await
+            .unwrap();
         assert!(
             result.content[0]
                 .as_text()
@@ -464,12 +792,10 @@ mod tests {
             ],
         );
         fs::write(dir.path().join("file.txt"), "changed\n").unwrap();
-
         let result = service(dir.path())
-            .git_diff(Parameters(EmptyInput::default()))
+            .git_diff(Parameters(CwdInput { cwd: None }))
             .await
             .unwrap();
-
         assert!(
             result.content[0]
                 .as_text()
@@ -483,11 +809,11 @@ mod tests {
     async fn git_add_rejects_paths_outside_workspace() {
         let dir = TempDir::new().unwrap();
         let result = service(dir.path())
-            .git_add(Parameters(AddInput {
+            .git_add(Parameters(PathInput {
                 path: UnresolvedPath::new("../outside"),
+                cwd: None,
             }))
             .await;
-
         assert_matches!(
             result,
             Err(McpError {
@@ -498,12 +824,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn git_add_resolves_path_relative_to_cwd() {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path().join("repo");
+        fs::create_dir(&repo).unwrap();
+        git(&repo, &["init", "--quiet"]);
+        fs::write(repo.join("file.txt"), "content\n").unwrap();
+        service(dir.path())
+            .git_add(Parameters(PathInput {
+                path: UnresolvedPath::new("file.txt"),
+                cwd: Some(UnresolvedPath::new("repo")),
+            }))
+            .await
+            .unwrap();
+        let output = Command::new("git")
+            .args(["status", "--short"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&output.stdout).contains("A  file.txt"));
+    }
+
+    #[tokio::test]
+    async fn git_log_respects_limit() {
+        let dir = TempDir::new().unwrap();
+        git(dir.path(), &["init", "--quiet"]);
+        for index in 0..3 {
+            fs::write(dir.path().join("file.txt"), format!("{index}\n")).unwrap();
+            git(dir.path(), &["add", "file.txt"]);
+            git(
+                dir.path(),
+                &[
+                    "-c",
+                    "user.name=Test User",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "--quiet",
+                    "-m",
+                    "commit",
+                ],
+            );
+        }
+        let result = service(dir.path())
+            .git_log(Parameters(LogInput {
+                limit: 2,
+                cwd: None,
+            }))
+            .await
+            .unwrap();
+        assert_eq!(result.content[0].as_text().unwrap().text.lines().count(), 2);
+    }
+
+    #[tokio::test]
     async fn git_commit_creates_a_commit() {
         let dir = TempDir::new().unwrap();
         git(dir.path(), &["init", "--quiet"]);
         fs::write(dir.path().join("file.txt"), "content\n").unwrap();
         git(dir.path(), &["add", "file.txt"]);
-
         service(dir.path())
             .git_commit(Parameters(CommitInput {
                 commit_type: "fix".to_owned(),
@@ -512,10 +890,10 @@ mod tests {
                 body: vec!["Expose Git operations through the editor MCP.".to_owned()],
                 breaking_change_note: None,
                 amend: false,
+                cwd: None,
             }))
             .await
             .unwrap();
-
         let output = Command::new("git")
             .args(["log", "-1", "--pretty=%s"])
             .current_dir(dir.path())
@@ -536,10 +914,9 @@ mod tests {
             body: vec!["BREAKING CHANGE".to_owned()],
             breaking_change_note: None,
             amend: false,
+            cwd: None,
         };
-
         let errors = build_commit_message(&params).unwrap_err();
-
         assert_eq!(errors.len(), 3);
         assert!(
             errors
@@ -567,8 +944,8 @@ mod tests {
             body: vec!["Handle commit messages centrally.".to_owned()],
             breaking_change_note: Some("The commit input is now structured.".to_owned()),
             amend: false,
+            cwd: None,
         };
-
         assert_eq!(
             build_commit_message(&params).unwrap(),
             "feat(session)!: improve commit handling\n\nHandle commit messages centrally.\n\nBREAKING CHANGE: The commit input is now structured."
