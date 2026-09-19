@@ -177,8 +177,21 @@ impl McpService {
         if let Some(protected) = &recipe_toml_protected_path {
             ignore.push(IgnorePattern::exact_path(protected.clone()));
         }
+        let git_tool_router = Self::git_add_tool_router()
+            + Self::git_commit_tool_router()
+            + Self::git_diff_tool_router()
+            + Self::git_log_tool_router()
+            + Self::git_mv_tool_router()
+            + Self::git_pull_tool_router()
+            + Self::git_push_tool_router()
+            + Self::git_reset_soft_tool_router()
+            + Self::git_restore_tool_router()
+            + Self::git_rm_tool_router()
+            + Self::git_status_tool_router()
+            + Self::git_switch_tool_router();
+
         let tool_router = if disable_fs_tools {
-            ToolRouter::new()
+            git_tool_router
         } else {
             Self::create_tool_router()
                 + Self::insert_lines_tool_router()
@@ -187,7 +200,7 @@ impl McpService {
                 + Self::search_tool_router()
                 + Self::tree_tool_router()
                 + Self::view_tool_router()
-                + Self::git_tool_router()
+                + git_tool_router
         };
 
         Self {
@@ -197,5 +210,23 @@ impl McpService {
             recipes,
             tool_router,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use recipe::RecipeFile;
+    use std::collections::HashSet;
+
+    #[test]
+    fn keeps_git_tools_when_fs_tools_are_disabled() {
+        let service = McpService::new(PathBuf::new(), vec![], RecipeFile::default(), None, true);
+        let tools = service.tool_router.list_all();
+        let names: HashSet<_> = tools.iter().map(|tool| tool.name.to_string()).collect();
+
+        assert!(names.contains("git_status"));
+        assert!(names.contains("git_commit"));
+        assert!(!names.contains("fs_create"));
     }
 }

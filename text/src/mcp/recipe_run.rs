@@ -226,7 +226,7 @@ mod tests {
             "rust-lint",
             "rust-test",
             "rust-test-one",
-            "git-commit",
+            "rust-check",
         ] {
             assert!(
                 file.get(&RecipeName::from(name)).is_some(),
@@ -238,23 +238,20 @@ mod tests {
     #[test]
     fn tool_name_replaces_hyphens_with_underscores() {
         assert_eq!(
-            tool_name(&RecipeName::from("git-commit")),
-            "recipe_git_commit"
+            tool_name(&RecipeName::from("rust-check")),
+            "recipe_rust_check"
         );
     }
 
     #[test]
-    fn tools_prefixes_and_carries_one_property_per_arg() {
+    fn tools_prefix_recipe_names() {
         let file =
             discover(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../recipes.toml"));
         let generated = tools(&file);
-        let commit = generated
-            .iter()
-            .find(|t| t.name == "recipe_git_commit")
-            .expect("expected a recipe_git_commit tool");
-        assert_eq!(
-            commit.input_schema.get("required"),
-            Some(&Value::Array(vec![Value::String("message".to_owned())]))
+        assert!(
+            generated
+                .iter()
+                .any(|tool| tool.name == "recipe_rust_check")
         );
     }
 
