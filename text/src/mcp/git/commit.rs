@@ -58,8 +58,8 @@ struct Input {
     scope: Option<String>,
     /// Commit description.
     description: String,
-    /// Commit body paragraphs, each word-wrapped independently.
-    body: Vec<String>,
+    /// Commit body as plain text; blank lines separate paragraphs, each word-wrapped independently.
+    body: String,
     /// Optional breaking-change note.
     #[serde(default)]
     breaking_change_note: Option<String>,
@@ -95,28 +95,24 @@ enum CommitMessageError {
 
 fn build_commit_message(params: &Input) -> Result<String, Vec<CommitMessageError>> {
     let mut errors = Vec::new();
+    let paragraphs = split_paragraphs(&params.body);
 
-    if params
-        .body
-        .iter()
-        .all(|paragraph| paragraph.trim().is_empty())
-    {
+    if paragraphs.iter().all(|paragraph| paragraph.is_empty()) {
         errors.push(CommitMessageError::EmptyBody);
     }
-    if params
-        .body
+    if paragraphs
         .iter()
         .any(|paragraph| paragraph.contains("BREAKING CHANGE"))
     {
         errors.push(CommitMessageError::BreakingChangeInBody);
     }
 
-    let body_lines = wrap_body_lines(&params.body);
+    let body_lines = wrap_body_lines(&paragraphs);
     if body_lines.len() > 12 {
         errors.push(CommitMessageError::TooManyBodyLines {
             lines: body_lines.len(),
-            words: word_count(&params.body),
-            paragraphs: params.body.len(),
+            words: word_count(&paragraphs),
+            paragraphs: paragraphs.len(),
         });
     }
 
@@ -166,6 +162,15 @@ fn build_commit_message(params: &Input) -> Result<String, Vec<CommitMessageError
         message.push_str(&lines.join("\n    "));
     }
     Ok(message)
+}
+
+/// Splits body text into paragraphs at blank lines, trimming and dropping empty ones.
+fn split_paragraphs(text: &str) -> Vec<String> {
+    text.split("\n\n")
+        .map(str::trim)
+        .filter(|paragraph| !paragraph.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 fn word_count(paragraphs: &[String]) -> usize {
@@ -305,7 +310,7 @@ mod tests {
                 commit_type: CommitType::Fix,
                 scope: None,
                 description: "Add Git tools".to_owned(),
-                body: vec!["Expose Git operations through the editor MCP.".to_owned()],
+                body: "Expose Git operations through the editor MCP.".to_owned(),
                 breaking_change_note: None,
                 amend: false,
                 cwd: None,
@@ -329,7 +334,7 @@ mod tests {
             commit_type: CommitType::Fix,
             scope: None,
             description: "A very long description that makes the summary too long".to_owned(),
-            body: vec!["BREAKING CHANGE".to_owned()],
+            body: "BREAKING CHANGE".to_owned(),
             breaking_change_note: None,
             amend: false,
             cwd: None,
@@ -355,7 +360,7 @@ mod tests {
             commit_type: CommitType::Feat,
             scope: Some("session".to_owned()),
             description: "Improve commit handling".to_owned(),
-            body: vec!["Handle commit messages centrally.".to_owned()],
+            body: "Handle commit messages centrally.".to_owned(),
             breaking_change_note: Some("The commit input is now structured.".to_owned()),
             amend: false,
             cwd: None,
@@ -363,6 +368,23 @@ mod tests {
         assert_eq!(
             build_commit_message(&params).unwrap(),
             "feat(session)!: improve commit handling\n\nHandle commit messages centrally.\n\nBREAKING CHANGE: The commit input is now structured."
+        );
+    }
+
+    #[test]
+    fn build_commit_message_splits_paragraphs_on_blank_lines() {
+        let params = Input {
+            commit_type: CommitType::Fix,
+            scope: None,
+            description: "Split body paragraphs".to_owned(),
+            body: "First paragraph.\n\nSecond paragraph.".to_owned(),
+            breaking_change_note: None,
+            amend: false,
+            cwd: None,
+        };
+        assert_eq!(
+            build_commit_message(&params).unwrap(),
+            "fix: split body paragraphs\n\nFirst paragraph.\n\nSecond paragraph."
         );
     }
 
