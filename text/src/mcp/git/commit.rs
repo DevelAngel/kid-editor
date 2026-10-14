@@ -9,6 +9,7 @@ use rmcp::{tool, tool_router};
 use serde::Deserialize;
 use std::mem;
 use thiserror::Error;
+use url::Url;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 enum CommitType {
@@ -93,9 +94,12 @@ enum CommitMessageError {
     TooManyBreakingChangeLines { lines: usize, words: usize },
 }
 
-fn build_commit_message(params: &Input) -> Result<String, Vec<CommitMessageError>> {
+fn build_commit_message(
+    params: &Input,
+    allowed_origins: &[Url],
+) -> Result<String, Vec<CommitMessageError>> {
     let mut errors = Vec::new();
-    let paragraphs = split_paragraphs(&params.body);
+    let paragraphs = split_paragraphs(&remove_co_author_lines(&params.body, allowed_origins));
 
     if paragraphs.iter().all(|paragraph| paragraph.is_empty()) {
         errors.push(CommitMessageError::EmptyBody);
@@ -171,6 +175,39 @@ fn split_paragraphs(text: &str) -> Vec<String> {
         .filter(|paragraph| !paragraph.is_empty())
         .map(str::to_owned)
         .collect()
+}
+
+fn remove_co_author_lines(text: &str, allowed_origins: &[Url]) -> String {
+    let mut lines = Vec::new();
+
+    for line in text.lines() {
+        let line_start = line.trim_start().to_ascii_lowercase();
+        let is_co_author =
+            line_start.starts_with("co-authored-by:") || line_start.starts_with("co-authored-by,");
+        let is_allowed_session = line.to_ascii_lowercase().contains("session")
+            && line_start
+                .split_once(':')
+                .map(|pair| pair.1.trim())
+                .and_then(|value| Url::parse(value).ok())
+                .is_some_and(|url| {
+                    allowed_origins
+                        .iter()
+                        .any(|origin| origin.origin() == url.origin())
+                });
+
+        if is_co_author || is_allowed_session {
+            while lines
+                .last()
+                .is_some_and(|line: &&str| line.trim().is_empty())
+            {
+                lines.pop();
+            }
+        } else {
+            lines.push(line);
+        }
+    }
+
+    lines.join("\n")
 }
 
 fn word_count(paragraphs: &[String]) -> usize {
@@ -258,7 +295,7 @@ impl McpService {
         &self,
         Parameters(input): Parameters<Input>,
     ) -> Result<CallToolResult, McpError> {
-        let commit_message = match build_commit_message(&input) {
+        let commit_message = match build_commit_message(&input, &self.allowed_origins) {
             Ok(message) => message,
             Err(errors) => {
                 let text = errors
@@ -296,36 +333,15 @@ mod tests {
     use super::*;
     use crate::mcp::git::{git, service};
     use assert_fs::TempDir;
+    use indoc::indoc;
+    use std::fs;
     use std::path::Path;
     use std::process::Command;
 
-    #[tokio::test]
-    async fn git_commit_creates_a_commit() {
-        let dir = TempDir::new().unwrap();
-        git(dir.path(), &["init", "--quiet"]);
-        std::fs::write(dir.path().join("file.txt"), "content\n").unwrap();
-        git(dir.path(), &["add", "file.txt"]);
-        service(dir.path())
-            .git_commit(Parameters(Input {
-                commit_type: CommitType::Fix,
-                scope: None,
-                description: "Add Git tools".to_owned(),
-                body: "Expose Git operations through the editor MCP.".to_owned(),
-                breaking_change_note: None,
-                amend: false,
-                cwd: None,
-            }))
-            .await
-            .unwrap();
-        let output = Command::new("git")
-            .args(["log", "-1", "--pretty=%s"])
-            .current_dir(dir.path())
-            .output()
-            .unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&output.stdout).trim(),
-            "fix: add Git tools"
-        );
+    #[test]
+    fn lowercase_first_char_preserves_acronyms() {
+        assert_eq!(lowercase_first_char("Add"), "add");
+        assert_eq!(lowercase_first_char("XML parser"), "XML parser");
     }
 
     #[test]
@@ -340,7 +356,7 @@ mod tests {
             cwd: None,
         };
 
-        let errors = build_commit_message(&params).unwrap_err();
+        let errors = build_commit_message(&params, &[]).unwrap_err();
         assert!(
             errors
                 .iter()
@@ -366,8 +382,13 @@ mod tests {
             cwd: None,
         };
         assert_eq!(
-            build_commit_message(&params).unwrap(),
-            "feat(session)!: improve commit handling\n\nHandle commit messages centrally.\n\nBREAKING CHANGE: The commit input is now structured."
+            build_commit_message(&params, &[]).unwrap(),
+            indoc! {"
+                feat(session)!: improve commit handling
+
+                Handle commit messages centrally.
+
+                BREAKING CHANGE: The commit input is now structured."}
         );
     }
 
@@ -377,21 +398,112 @@ mod tests {
             commit_type: CommitType::Fix,
             scope: None,
             description: "Split body paragraphs".to_owned(),
-            body: "First paragraph.\n\nSecond paragraph.".to_owned(),
+            body: indoc! {"
+                First paragraph.
+
+                Second paragraph.
+            "}
+            .to_owned(),
             breaking_change_note: None,
             amend: false,
             cwd: None,
         };
         assert_eq!(
-            build_commit_message(&params).unwrap(),
-            "fix: split body paragraphs\n\nFirst paragraph.\n\nSecond paragraph."
+            build_commit_message(&params, &[]).unwrap(),
+            indoc! {"
+                fix: split body paragraphs
+
+                First paragraph.
+
+                Second paragraph."}
         );
     }
 
-    #[test]
-    fn lowercase_first_char_preserves_acronyms() {
-        assert_eq!(lowercase_first_char("Add"), "add");
-        assert_eq!(lowercase_first_char("XML parser"), "XML parser");
+    #[tokio::test]
+    async fn git_commit_creates_a_commit() {
+        let dir = TempDir::new().unwrap();
+        git(dir.path(), &["init", "--quiet"]);
+        fs::write(dir.path().join("file.txt"), "content\n").unwrap();
+        git(dir.path(), &["add", "file.txt"]);
+        service(dir.path())
+            .git_commit(Parameters(Input {
+                commit_type: CommitType::Fix,
+                scope: None,
+                description: "Add Git tools".to_owned(),
+                body: "Expose Git operations through the editor MCP.".to_owned(),
+                breaking_change_note: None,
+                amend: false,
+                cwd: None,
+            }))
+            .await
+            .unwrap();
+        let output = Command::new("git")
+            .args(["log", "-1", "--pretty=%s"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "fix: add Git tools"
+        );
+    }
+
+    #[tokio::test]
+    async fn git_commit_removes_co_author_lines_from_the_entire_body() {
+        let dir = TempDir::new().unwrap();
+        git(dir.path(), &["init", "--quiet"]);
+        fs::write(dir.path().join("file.txt"), "content\n").unwrap();
+        git(dir.path(), &["add", "file.txt"]);
+
+        let allowed_origins = vec![
+            Url::parse("https://claude.ai").unwrap(),
+            Url::parse("https://example.com").unwrap(),
+        ];
+        service(dir.path())
+            .with_allowed_origins(allowed_origins)
+            .git_commit(Parameters(Input {
+                commit_type: CommitType::Fix,
+                scope: None,
+                description: "Remove co-author lines".to_owned(),
+                body: indoc! {"
+                    First paragraph.
+
+                    Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+                    Claude-Session: https://claude.ai/code/session_01P7T33nwW5dzcXvWWmBZ3fe
+
+                    Second paragraph.
+
+                    co-authored-by, Second <second@example.com>
+                    My-Session: https://example.com/code/session_456
+
+                    Third paragraph.
+
+                    CO-AUTHORED-BY: Last <last@example.com>
+                "}
+                .to_owned(),
+                breaking_change_note: None,
+                amend: false,
+                cwd: None,
+            }))
+            .await
+            .unwrap();
+
+        let output = Command::new("git")
+            .args(["log", "-1", "--pretty=%B"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            indoc! {"
+                fix: remove co-author lines
+
+                First paragraph.
+
+                Second paragraph.
+
+                Third paragraph."}
+        );
     }
 
     #[allow(dead_code)]

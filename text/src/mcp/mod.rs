@@ -32,6 +32,7 @@ use rmcp::service::RequestContext;
 use rmcp::{RoleServer, ServerHandler};
 
 use std::path::PathBuf;
+use url::Url;
 
 /// MCP server exposing a text-editor tool, sandboxed to one workspace root.
 #[derive(Clone)]
@@ -62,6 +63,7 @@ pub struct McpService {
     /// `--recipes-file`. Empty if that flag wasn't passed or the file
     /// doesn't exist — see ADR 0004.
     recipes: RecipeFile,
+    allowed_origins: Vec<Url>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -208,8 +210,14 @@ impl McpService {
             ignore,
             recipe_toml_protected_path,
             recipes,
+            allowed_origins: Vec::new(),
             tool_router,
         }
+    }
+
+    pub fn with_allowed_origins(mut self, allowed_origins: Vec<Url>) -> Self {
+        self.allowed_origins = allowed_origins;
+        self
     }
 }
 

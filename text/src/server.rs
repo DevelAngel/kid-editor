@@ -56,6 +56,7 @@ impl McpServer {
             }
         );
 
+        let configured_origins = self.allowed_origins.clone();
         let all_origins: Vec<Url> = iter::once(self.base_url.clone())
             .chain(self.allowed_origins)
             .collect();
@@ -145,7 +146,8 @@ impl McpServer {
                     recipes.clone(),
                     recipe_toml_protected_path.clone(),
                     disable_fs_tools,
-                ))
+                )
+                .with_allowed_origins(configured_origins.clone()))
             },
             LocalSessionManager::default().into(),
             StreamableHttpServerConfig::default()
