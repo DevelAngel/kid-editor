@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use rmcp::ServiceExt;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, ContentBlock, ErrorData as McpError, Implementation,
-    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
+    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
 };
 use rmcp::service::{RequestContext, RunningService};
 use rmcp::transport::auth::AuthClient;
@@ -37,8 +37,8 @@ pub struct GatewayService {
 }
 
 impl ServerHandler for GatewayService {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new(
                 "kid-mcp-gateway",
                 env!("CARGO_PKG_VERSION"),
